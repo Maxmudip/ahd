@@ -1,7 +1,7 @@
 import Anthropic from "@anthropic-ai/sdk";
 
 /** Model used by every AI route. Change the model here only. */
-export const CLAUDE_MODEL = "claude-sonnet-4-5-20251001";
+export const CLAUDE_MODEL = "claude-3-5-sonnet-20241022";
 
 /**
  * Server-only Anthropic client factory. The key comes from `process.env.ANTHROPIC_API_KEY`
