@@ -16,12 +16,17 @@ export function AgreementCard({
   time,
   onView,
   onSign,
+  onRegenerate,
+  regenerating = false,
 }: {
   id: string;
   deal: Deal;
   time: string;
   onView: () => void;
   onSign: () => void;
+  /** Throws the current agreement away and asks the AI for a new one. */
+  onRegenerate?: () => void;
+  regenerating?: boolean;
 }) {
   const agreement = deal.agreement;
   if (!agreement) return null;
@@ -47,11 +52,11 @@ export function AgreementCard({
             </p>
           </div>
         ) : null}
-        <div className="mt-3 flex gap-2">
+        <div className="mt-3 flex flex-wrap gap-2">
           <button
             type="button"
             onClick={onView}
-            className="h-11 flex-1 rounded-[8px] md:h-9 border border-line text-[13.5px] font-medium text-otherink hover:bg-hov"
+            className="h-11 min-w-[88px] flex-1 rounded-[8px] md:h-9 border border-line text-[13.5px] font-medium text-otherink hover:bg-hov"
           >
             Ko&apos;rish
           </button>
@@ -59,10 +64,20 @@ export function AgreementCard({
             type="button"
             onClick={onSign}
             disabled={allSigned}
-            className="h-11 flex-1 rounded-[8px] md:h-9 bg-btn text-[13.5px] font-medium text-btnink hover:opacity-85 disabled:cursor-not-allowed disabled:opacity-40"
+            className="h-11 min-w-[88px] flex-1 rounded-[8px] md:h-9 bg-btn text-[13.5px] font-medium text-btnink hover:opacity-85 disabled:cursor-not-allowed disabled:opacity-40"
           >
             {allSigned ? "Imzolangan ✓" : "Imzolash"}
           </button>
+          {onRegenerate ? (
+            <button
+              type="button"
+              onClick={onRegenerate}
+              disabled={regenerating}
+              className="h-11 min-w-[88px] flex-[1.3] rounded-[8px] border border-line text-[13px] font-medium text-ink2 hover:bg-hov disabled:cursor-not-allowed disabled:opacity-40 md:h-9"
+            >
+              {regenerating ? "Yaratilmoqda…" : "🔄 Qayta yaratish"}
+            </button>
+          ) : null}
         </div>
       </div>
     </Bubble>

@@ -6,6 +6,7 @@ import { useParams, useRouter } from "next/navigation";
 import { Archive, Download, FileText, Paperclip, Sparkles, Users } from "lucide-react";
 import { AgreementPaper } from "@/components/agreement-paper";
 import { useApp } from "@/components/app-store";
+import { MediatorTip, MediatorTyping, type MediatorTipData } from "@/components/ai-mediator";
 import { Avatar } from "@/components/avatar";
 import { Button } from "@/components/button";
 import { AgreementCard, SignatureCard } from "@/components/chat-cards";
@@ -36,6 +37,10 @@ import {
 
 type Busy = null | "generate" | "analyze";
 
+function realLastId(messages: ChatMessage[]) {
+  return [...messages].reverse().find((m) => m.side !== "system" && !m.kind)?.id ?? null;
+}
+
 export default function DealChatPage() {
   const params = useParams<{ id: string }>();
   const id = params.id;
@@ -49,6 +54,12 @@ export default function DealChatPage() {
   const [drawer, setDrawer] = useState<"doc" | "people" | null>(null);
   const [notice, setNotice] = useState("");
   const [genError, setGenError] = useState("");
+  // AI Mediator: live-session tips only — kept out of deal.messages so they are never saved or counted.
+  const [tips, setTips] = useState<(MediatorTipData & { dealId: string })[]>([]);
+  const [mediating, setMediating] = useState<string | null>(null);
+  const mediatingRef = useRef(false);
+  const shownTips = useRef<Record<string, string[]>>({});
+  const lastRealCount = useRef<{ id: string; count: number } | null>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
   const fileRef = useRef<HTMLInputElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -62,7 +73,57 @@ export default function DealChatPage() {
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: firstScroll.current ? "auto" : "smooth", block: "end" });
     firstScroll.current = false;
-  }, [messageCount, busy]);
+  }, [messageCount, busy, tips.length, mediating]);
+
+  // Real chat messages only: people's text — no system notices, cards or AI replies.
+  const realMessages = useMemo(
+    () => deal?.messages.filter((m) => m.side !== "system" && !m.kind) ?? [],
+    [deal],
+  );
+  const realCount = realMessages.length;
+  const dealId = deal?.id ?? null;
+  const hasAgreement = Boolean(deal?.agreement);
+
+  // After every 3rd message (3, 6, 9 …) that arrives while this chat is open, ask the mediator what is missing.
+  useEffect(() => {
+    if (!dealId) return;
+    const prev = lastRealCount.current;
+    lastRealCount.current = { id: dealId, count: realCount };
+    // First sight of this chat only sets the baseline, so opening a chat never triggers the AI.
+    if (!prev || prev.id !== dealId) return;
+    if (hasAgreement || mediatingRef.current) return;
+    if (Math.floor(realCount / 3) <= Math.floor(prev.count / 3)) return;
+
+    mediatingRef.current = true;
+    const chat = realMessages.map((m) => ({ author: m.author, text: m.text, time: m.time }));
+    const afterId = realMessages[realMessages.length - 1]?.id ?? null;
+    const previousTips = shownTips.current[dealId] ?? [];
+    queueMicrotask(() => setMediating(dealId));
+
+    void (async () => {
+      try {
+        const response = await fetch("/api/ai-mediator", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ messages: chat, previousTips }),
+        });
+        const data = (await response.json().catch(() => null)) as { suggestion?: string | null; error?: string } | null;
+        if (!response.ok) throw new Error(data?.error ?? `HTTP ${response.status}`);
+        const text = data?.suggestion?.trim();
+        // "complete" comes back as null: nothing important is missing, so no bubble.
+        if (text) {
+          shownTips.current[dealId] = [...previousTips, text];
+          setTips((all) => [...all, { id: freshId(), dealId, afterId, text }]);
+        }
+      } catch (error) {
+        // The mediator is a nice-to-have: never interrupt the conversation with an error.
+        console.warn("[ai-mediator]", error instanceof Error ? error.message : error);
+      } finally {
+        mediatingRef.current = false;
+        setMediating(null);
+      }
+    })();
+  }, [dealId, realCount, realMessages, hasAgreement]);
 
   const canGenerate = useMemo(
     () => Boolean(deal?.messages.some((m) => m.side !== "system" && !m.kind)),
@@ -89,13 +150,13 @@ export default function DealChatPage() {
     inputRef.current?.focus();
   }
 
-  /** `fromPanel`: regenerate while the agreement panel stays open (it shows its own loading state). */
-  async function generate(fromPanel = false) {
+  /** `regen`: replace the existing agreement in place — the panel is neither closed nor force-opened. */
+  async function generate(regen = false) {
     if (!deal || busy || !canGenerate) return;
     setBusy("generate");
     setPlusOpen(false);
     setGenError("");
-    if (!fromPanel) setDrawer(null);
+    if (!regen) setDrawer(null);
 
     try {
       // Everything the parties wrote (no system notices or cards) goes to Claude.
@@ -143,7 +204,7 @@ export default function DealChatPage() {
         },
         true,
       );
-      setDrawer("doc");
+      if (!regen) setDrawer("doc");
     } catch (error) {
       // The previous agreement stays untouched when generation fails.
       const message = error instanceof Error ? error.message : "Kelishuvni yaratib bo'lmadi.";
@@ -152,6 +213,10 @@ export default function DealChatPage() {
     } finally {
       setBusy(null);
     }
+  }
+
+  function dismissTip(tipId: string) {
+    setTips((all) => all.filter((tip) => tip.id !== tipId));
   }
 
   function regenerate() {
@@ -280,6 +345,12 @@ export default function DealChatPage() {
       ? [{ label: "📄 Kelishuv yaratish", onClick: () => void generate() }]
       : undefined;
 
+  // Tips whose anchor message no longer exists are shown at the end instead of vanishing.
+  const messageIds = new Set(deal.messages.map((m) => m.id));
+  const dealTips = tips
+    .filter((tip) => tip.dealId === deal.id)
+    .map((tip) => (tip.afterId && messageIds.has(tip.afterId) ? tip : { ...tip, afterId: realLastId(deal.messages) }));
+
   const items = deal.messages.map((message, index, all) => {
     const day = message.day ?? "Bugun";
     const prev = all[index - 1];
@@ -349,8 +420,22 @@ export default function DealChatPage() {
             <div key={message.id} className="contents">
               {showDay ? <DateDivider label={day} /> : null}
               {renderMessage(message)}
+              {dealTips
+                .filter((tip) => tip.afterId === message.id)
+                .map((tip) => (
+                  <MediatorTip
+                    key={tip.id}
+                    tip={tip}
+                    onDiscuss={() => {
+                      dismissTip(tip.id);
+                      inputRef.current?.focus();
+                    }}
+                    onIgnore={() => dismissTip(tip.id)}
+                  />
+                ))}
             </div>
           ))}
+          {mediating === deal.id ? <MediatorTyping /> : null}
           {busy ? (
             <TypingBubble label={busy === "generate" ? "Kelishuv tayyorlanmoqda…" : "Tahlil qilinmoqda…"} />
           ) : null}
@@ -403,16 +488,6 @@ export default function DealChatPage() {
                 {genError}
               </p>
             ) : null}
-            <div className="mt-3 flex justify-end">
-              <Button
-                variant="outline"
-                onClick={regenerate}
-                disabled={busy !== null || !canGenerate}
-                className="!h-8 !px-3 text-[13px] !text-[#787774]"
-              >
-                🔄 Qayta yaratish
-              </Button>
-            </div>
           </div>
         ) : (
           <div className="flex flex-col items-center px-6 py-16 text-center">
@@ -479,6 +554,8 @@ export default function DealChatPage() {
           time={message.time}
           onView={() => setDrawer("doc")}
           onSign={signNext}
+          onRegenerate={regenerate}
+          regenerating={busy === "generate"}
         />
       );
     }

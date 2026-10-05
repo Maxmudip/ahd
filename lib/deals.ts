@@ -102,11 +102,6 @@ export function documentIdForDeal(dealId: string) {
 }
 
 export function buildAgreementFromDeal(deal: Deal): AgreementDocument {
-  const terms = deal.messages
-    .filter((m) => m.side !== "system" && !m.kind)
-    .map((m) => `${m.author} ta'kidladi: ${m.text}`)
-    .join(" ");
-
   const now = new Date();
   const parties = deal.parties.map((p) => ({ ...p, signedAt: null }));
 
@@ -131,9 +126,7 @@ export function buildAgreementFromDeal(deal: Deal): AgreementDocument {
       {
         number: "3",
         title: "Kelishilgan shartlar",
-        body:
-          terms ||
-          "Shartlar muhokama jarayonida aniqlashtiriladi va tomonlarning yozma roziligi bilan kiritiladi.",
+        body: "Shartlar muhokama jarayonida aniqlashtiriladi va tomonlarning yozma roziligi bilan kiritiladi. [ANIQLANISHI KERAK]",
       },
       {
         number: "4",

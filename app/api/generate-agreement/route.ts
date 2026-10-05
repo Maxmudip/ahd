@@ -1,5 +1,6 @@
 import Anthropic from "@anthropic-ai/sdk";
 import { createAnthropic, describeKey, readAnthropicKey } from "@/lib/anthropic";
+import { buildTranscript } from "@/lib/chat-transcript";
 import { NextResponse, type NextRequest } from "next/server";
 import { createServerSupabase } from "@/lib/supabase-server";
 
@@ -11,30 +12,40 @@ export const maxDuration = 60;
 
 const MODEL = "claude-sonnet-4-5";
 
-const SYSTEM_PROMPT = `You are a legal document assistant for Uzbekistan. Analyze the chat conversation and extract the key agreement terms. Then write a formal contract with these exact sections:
+const SYSTEM_PROMPT = `You are a legal document assistant.
+Extract ONLY the key agreement terms from the chat.
+DO NOT copy chat messages word by word.
+DO NOT write 'Muhammad ta'kidladi' or similar.
 
-1. Tomonlar - Party A and Party B full names
-2. Shartnoma predmeti - What work/service is agreed
-3. Narx va to'lov shartlari - Price and payment terms (upfront amount, final payment, total)
-4. Muddatlar - Deadlines and timeline
-5. Tomonlar majburiyatlari - Obligations of each party
-6. Kelishuv shartlari - Special conditions if any
-7. Nizolarni hal etish - Dispute resolution
+Generate a clean formal contract with these sections:
 
-Write each section as proper legal clauses.
-Extract ONLY the actual agreed terms from the chat.
-Do NOT copy raw chat messages.
-Use formal Uzbek legal language.
-If a detail is missing write [ANIQLANISHI KERAK]
+1. TOMONLAR
+Extract party names from the conversation.
 
-Output format: start with a one-line contract title, then the seven sections, each introduced by its number and Uzbek title on its own line (for example "1. Tomonlar"), followed by the clauses of that section. Return only the contract text, with no commentary.`;
+2. SHARTNOMA PREDMETI
+What service/work was agreed (1-2 sentences)
 
-// Input limits keep one request from burning an unbounded amount of tokens.
-const MAX_MESSAGES = 200;
-const MAX_MESSAGE_CHARS = 2000;
-const MAX_TOTAL_CHARS = 40_000;
+3. NARX VA TO'LOV
+- Umumiy narx: [amount]
+- Avans: [amount]
+- Qoldiq to'lov: [amount] (when)
 
-type IncomingMessage = { author?: unknown; text?: unknown; time?: unknown };
+4. MUDDAT
+- Boshlanish: [date or immediately]
+- Tugash: [deadline from chat]
+
+5. TOMONLAR MAJBURIYATLARI
+Party A (client): bullet points
+Party B (contractor): bullet points
+
+6. NIZOLARNI HAL ETISH
+Standard clause in Uzbek
+
+Write in clean formal Uzbek legal language.
+Extract facts only, no chat quotes.
+If a detail was not agreed in the chat, write [ANIQLANISHI KERAK] instead of inventing it.
+
+Output format: a one-line contract title first, then the six sections. Each section starts on its own line with its number and title exactly as above (for example "1. TOMONLAR"), followed by its content. Return only the contract text, with no commentary.`;
 
 function fail(error: string, status: number) {
   return NextResponse.json({ error }, { status });
@@ -69,17 +80,7 @@ export async function POST(request: NextRequest) {
   }
 
   if (!Array.isArray(body.messages)) return fail("`messages` massivi kerak.", 400);
-  const lines: string[] = [];
-  let total = 0;
-  for (const raw of (body.messages as IncomingMessage[]).slice(-MAX_MESSAGES)) {
-    if (!raw || typeof raw.text !== "string" || !raw.text.trim()) continue;
-    const author = typeof raw.author === "string" && raw.author.trim() ? raw.author.trim().slice(0, 80) : "Noma'lum";
-    const time = typeof raw.time === "string" ? ` [${raw.time.slice(0, 20)}]` : "";
-    const line = `${author}${time}: ${raw.text.trim().slice(0, MAX_MESSAGE_CHARS)}`;
-    total += line.length;
-    if (total > MAX_TOTAL_CHARS) break;
-    lines.push(line);
-  }
+  const lines = buildTranscript(body.messages);
   if (lines.length === 0) return fail("Chatda kelishuv uchun xabarlar yo'q.", 400);
 
   const title = typeof body.title === "string" ? body.title.trim().slice(0, 120) : "";
