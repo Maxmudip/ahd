@@ -1,7 +1,7 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
-  /* config options here */
+  serverExternalPackages: ["jspdf", "canvg", "html2canvas", "core-js"],
 };
 
 export default nextConfig;

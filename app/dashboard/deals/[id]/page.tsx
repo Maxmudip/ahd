@@ -1,0 +1,454 @@
+"use client";
+
+import { ChangeEvent, FormEvent, useEffect, useMemo, useRef, useState } from "react";
+import Link from "next/link";
+import { useParams, useRouter } from "next/navigation";
+import { Archive, Download, FileText, Paperclip, Sparkles, Users } from "lucide-react";
+import { AgreementPaper } from "@/components/agreement-paper";
+import { useApp } from "@/components/app-store";
+import { Avatar } from "@/components/avatar";
+import { Button } from "@/components/button";
+import { AgreementCard, SignatureCard } from "@/components/chat-cards";
+import {
+  Bubble,
+  ChatHeader,
+  ChatInputBar,
+  DateDivider,
+  EmptyNote,
+  IconButton,
+  InfoDrawer,
+  MenuButton,
+  SystemMessage,
+  TypingBubble,
+  type PillItem,
+} from "@/components/chat-ui";
+import { KindBadge } from "@/components/kind-badge";
+import { StatusBadge } from "@/components/status-badge";
+import { formatFileSize, freshId, initialsOf, nameColor } from "@/lib/chat-helpers";
+import { downloadAgreementPdf } from "@/lib/export-agreement-pdf";
+import {
+  STATUS_LABEL,
+  buildAgreementFromDeal,
+  formatUzDate,
+  nowTime,
+  type ChatMessage,
+} from "@/lib/deals";
+
+type Busy = null | "generate" | "analyze";
+
+export default function DealChatPage() {
+  const params = useParams<{ id: string }>();
+  const id = params.id;
+  const router = useRouter();
+  const { me, deals, hydrated, updateDeal, markRead, archived, toggleArchive } = useApp();
+  const deal = deals.find((d) => d.id === id) ?? null;
+
+  const [draft, setDraft] = useState("");
+  const [busy, setBusy] = useState<Busy>(null);
+  const [plusOpen, setPlusOpen] = useState(false);
+  const [drawer, setDrawer] = useState<"doc" | "people" | null>(null);
+  const [notice, setNotice] = useState("");
+  const bottomRef = useRef<HTMLDivElement>(null);
+  const fileRef = useRef<HTMLInputElement>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
+  const firstScroll = useRef(true);
+
+  useEffect(() => {
+    markRead(id);
+  }, [id, markRead]);
+
+  const messageCount = deal?.messages.length ?? 0;
+  useEffect(() => {
+    bottomRef.current?.scrollIntoView({ behavior: firstScroll.current ? "auto" : "smooth", block: "end" });
+    firstScroll.current = false;
+  }, [messageCount, busy]);
+
+  const canGenerate = useMemo(
+    () => Boolean(deal?.messages.some((m) => m.side !== "system" && !m.kind)),
+    [deal],
+  );
+
+  function flash(text: string) {
+    setNotice(text);
+    window.setTimeout(() => setNotice(""), 3200);
+  }
+
+  function push(...messages: ChatMessage[]) {
+    const stamp = `Bugun, ${nowTime()}`;
+    updateDeal(id, (d) => ({ ...d, messages: [...d.messages, ...messages], updatedAt: stamp }), true);
+  }
+
+  function send(event: FormEvent) {
+    event.preventDefault();
+    const text = draft.trim();
+    if (!deal || !text) return;
+    push({ id: freshId(), author: me.name, side: "me", text, time: nowTime(), day: "Bugun" });
+    setDraft("");
+    setPlusOpen(false);
+    inputRef.current?.focus();
+  }
+
+  function generate() {
+    if (!deal || busy || !canGenerate) return;
+    setBusy("generate");
+    setPlusOpen(false);
+    window.setTimeout(() => {
+      const sysId = freshId();
+      const agreementId = freshId();
+      const signatureId = freshId();
+      const time = nowTime();
+      updateDeal(
+        id,
+        (d) => {
+          const agreement = buildAgreementFromDeal(d);
+          const base = d.messages.filter((m) => m.kind !== "agreement" && m.kind !== "signature");
+          const added: ChatMessage[] = [
+            {
+              id: sysId,
+              author: "Tizim",
+              side: "system",
+              text: "AI kelishuv qoralamasi tayyor.",
+              time,
+              day: "Bugun",
+            },
+            { id: agreementId, author: "Ahd AI", side: "them", kind: "agreement", text: "", time, day: "Bugun" },
+            { id: signatureId, author: "Ahd AI", side: "them", kind: "signature", text: "", time, day: "Bugun" },
+          ];
+          return {
+            ...d,
+            agreement,
+            parties: agreement.parties,
+            status: "signing",
+            messages: [...base, ...added],
+            updatedAt: `Bugun, ${time}`,
+          };
+        },
+        true,
+      );
+      setBusy(null);
+    }, 700);
+  }
+
+  function analyze() {
+    if (!deal || busy) return;
+    setPlusOpen(false);
+    setBusy("analyze");
+    const facts = deal.messages
+      .filter((m) => m.side !== "system" && !m.kind && /\d/.test(m.text))
+      .slice(-5)
+      .map((m) => `• ${m.text.length > 120 ? `${m.text.slice(0, 117)}…` : m.text}`);
+    const text = facts.length
+      ? `Aniqlangan shartlar:\n${facts.join("\n")}\n\nHujjatni tayyorlash uchun «Kelishuv yaratish»ni bosing.`
+      : "Hozircha summa yoki muddat topilmadi. Chatda raqamli shartlarni yozing.";
+    window.setTimeout(() => {
+      push({ id: freshId(), author: "Ahd AI", side: "them", kind: "ai", text, time: nowTime(), day: "Bugun" });
+      setBusy(null);
+    }, 600);
+  }
+
+  function onFile(event: ChangeEvent<HTMLInputElement>) {
+    const file = event.target.files?.[0];
+    event.target.value = "";
+    if (!file) return;
+    setPlusOpen(false);
+    push({
+      id: freshId(),
+      author: me.name,
+      side: "me",
+      kind: "file",
+      text: `${file.name} (${formatFileSize(file.size)})`,
+      time: nowTime(),
+      day: "Bugun",
+    });
+  }
+
+  function sign(partyName: string) {
+    const target = deal?.agreement?.parties.find((p) => p.name === partyName && !p.signedAt);
+    if (!target) return;
+    // You can only sign for yourself; parties without an Ahd account are signed by a member of the room.
+    if (target.userId && target.userId !== me.id) {
+      flash(`Bu imzoni faqat ${target.name} qo'ya oladi.`);
+      return;
+    }
+    const sysId = freshId();
+    const dated = formatUzDate();
+    const time = nowTime();
+    updateDeal(
+      id,
+      (d) => {
+        const agreement = d.agreement;
+        if (!agreement) return d;
+        const parties = agreement.parties.map((p) =>
+          p.name === partyName && !p.signedAt ? { ...p, signedAt: dated } : p,
+        );
+        if (parties.every((p, i) => p.signedAt === agreement.parties[i].signedAt)) return d;
+        const allSigned = parties.every((p) => p.signedAt);
+        const system: ChatMessage = {
+          id: sysId,
+          author: "Tizim",
+          side: "system",
+          text: allSigned ? "Barcha tomonlar imzoladi ✅ Kelishuv yakunlandi." : `${partyName} imzoladi ✍️`,
+          time,
+          day: "Bugun",
+        };
+        return {
+          ...d,
+          parties,
+          agreement: { ...agreement, parties },
+          status: allSigned ? "completed" : "signing",
+          messages: [...d.messages, system],
+          updatedAt: `Bugun, ${time}`,
+        };
+      },
+      true,
+    );
+  }
+
+  function signNext() {
+    const parties = deal?.agreement?.parties ?? [];
+    const next = parties.find((p) => !p.signedAt && (!p.userId || p.userId === me.id));
+    if (next) sign(next.name);
+    else {
+      const waiting = parties.find((p) => !p.signedAt);
+      if (waiting) flash(`Keyingi imzo: ${waiting.name}.`);
+    }
+  }
+
+  if (!hydrated && !deal) {
+    return (
+      <div className="chat-bg flex-1 space-y-3 p-6">
+        <div className="skeleton h-10 w-64" />
+        <div className="skeleton h-16 w-80" />
+      </div>
+    );
+  }
+
+  if (!deal) {
+    return (
+      <div className="chat-bg flex flex-1 flex-col items-center justify-center">
+        <EmptyNote emoji="🔎">Suhbat topilmadi.</EmptyNote>
+        <Link href="/dashboard" className="-mt-8 text-[14px] font-medium text-ink underline">
+          Ro&apos;yxatga qaytish
+        </Link>
+      </div>
+    );
+  }
+
+  const isArchived = archived.includes(deal.id);
+  const kind = deal.kind ?? "kelishuv";
+
+  const plusItems: PillItem[] = [
+    { label: "📄 Kelishuv yaratish", onClick: generate, disabled: !canGenerate || busy !== null },
+    { label: "💰 Qarz so'rash", onClick: () => router.push("/dashboard/pool-qarz/create") },
+    { label: "🤖 AI tahlil", onClick: analyze, disabled: busy !== null },
+    { label: "📎 Fayl yuborish", onClick: () => fileRef.current?.click() },
+  ];
+  const quick: PillItem[] | undefined =
+    !deal.agreement && canGenerate && !busy
+      ? [{ label: "📄 Kelishuv yaratish", onClick: generate }]
+      : undefined;
+
+  const items = deal.messages.map((message, index, all) => {
+    const day = message.day ?? "Bugun";
+    const prev = all[index - 1];
+    return { message, day, showDay: !prev || (prev.day ?? "Bugun") !== day };
+  });
+
+  return (
+    <div className="relative flex h-full min-h-0 flex-1 flex-col overflow-hidden">
+      <ChatHeader
+        back="/dashboard"
+        avatar={<Avatar initials={initialsOf(deal.counterparty)} size="hd" />}
+        title={deal.title}
+        subtitle={
+          <>
+            {deal.counterparty}
+            <span className="lg:hidden">
+              {" · "}
+              <KindBadge kind={kind} size="sm" /> · {STATUS_LABEL[deal.status]}
+            </span>
+          </>
+        }
+        center={
+          <>
+            <KindBadge kind={kind} />
+            <StatusBadge status={deal.status} />
+          </>
+        }
+        actions={
+          <>
+            <IconButton label="Hujjatni ko'rish" onClick={() => setDrawer("doc")}>
+              <FileText size={20} />
+            </IconButton>
+            <IconButton label="Ishtirokchilar" onClick={() => setDrawer("people")}>
+              <Users size={20} />
+            </IconButton>
+            <MenuButton
+              items={[
+                {
+                  label: "PDF yuklash",
+                  icon: <Download size={16} />,
+                  disabled: !deal.agreement,
+                  onClick: () => deal.agreement && void downloadAgreementPdf(deal.agreement),
+                },
+                {
+                  label: "AI kelishuv yaratish",
+                  icon: <Sparkles size={16} />,
+                  disabled: !canGenerate || busy !== null,
+                  onClick: generate,
+                },
+                {
+                  label: isArchived ? "Arxivdan chiqarish" : "Arxivlash",
+                  icon: <Archive size={16} />,
+                  onClick: () => {
+                    toggleArchive(deal.id);
+                    flash(isArchived ? "Arxivdan chiqarildi." : "Arxivga ko'chirildi.");
+                  },
+                },
+              ]}
+            />
+          </>
+        }
+      />
+
+      <div className="chat-bg min-h-0 flex-1 overflow-y-auto px-3 py-3 md:px-6">
+        <div className="flex w-full flex-col gap-1.5">
+          {items.map(({ message, day, showDay }) => (
+            <div key={message.id} className="contents">
+              {showDay ? <DateDivider label={day} /> : null}
+              {renderMessage(message)}
+            </div>
+          ))}
+          {busy ? (
+            <TypingBubble label={busy === "generate" ? "Kelishuv tayyorlanmoqda…" : "Tahlil qilinmoqda…"} />
+          ) : null}
+          <div ref={bottomRef} />
+        </div>
+      </div>
+
+      <input ref={fileRef} type="file" className="hidden" onChange={onFile} />
+      <ChatInputBar
+        value={draft}
+        onChange={setDraft}
+        onSubmit={send}
+        placeholder="Xabar yozing..."
+        inputRef={inputRef}
+        notice={notice}
+        plus={{ open: plusOpen, onToggle: () => setPlusOpen((v) => !v), items: plusItems }}
+        quick={quick}
+      />
+
+      <InfoDrawer open={drawer === "doc"} title="Hujjat" onClose={() => setDrawer(null)}>
+        {deal.agreement ? (
+          <div className="p-4">
+            <div className="mb-3 flex items-center justify-between gap-2">
+              <StatusBadge status={deal.status} />
+              <Button variant="secondary" onClick={() => void downloadAgreementPdf(deal.agreement!)}>
+                <Download size={14} className="mr-1.5" />
+                PDF yuklash
+              </Button>
+            </div>
+            <div data-theme="light" className="rounded-[10px] bg-white p-5 text-[#111] shadow-[0_1px_3px_rgba(0,0,0,0.12)]">
+              <AgreementPaper agreement={deal.agreement} status={deal.status} onSign={sign} />
+            </div>
+          </div>
+        ) : (
+          <div className="flex flex-col items-center px-6 py-16 text-center">
+            <p className="text-[32px]" aria-hidden>
+              📄
+            </p>
+            <p className="mt-3 text-[16px] font-medium text-ink">Kelishuv yaratilmagan</p>
+            <p className="mt-1 max-w-xs text-[14px] text-ink2">
+              Chatda shartlarni yozing, so&apos;ng hujjatni AI orqali tuzing.
+            </p>
+            <Button
+              variant="primary"
+              className="mt-5"
+              disabled={!canGenerate || busy !== null}
+              onClick={() => {
+                setDrawer(null);
+                generate();
+              }}
+            >
+              AI kelishuv yaratish
+            </Button>
+          </div>
+        )}
+      </InfoDrawer>
+
+      <InfoDrawer open={drawer === "people"} title="Ishtirokchilar" onClose={() => setDrawer(null)}>
+        <ul className="py-2">
+          {deal.parties.map((party) => (
+            <li key={`${party.role}-${party.name}`} className="flex min-h-12 items-center gap-3 px-4 py-2">
+              <Avatar initials={initialsOf(party.name)} size="xl" />
+              <span className="min-w-0 flex-1">
+                <span className="block truncate text-[15px] font-medium text-ink">{party.name}</span>
+                <span className="block text-[13px] text-ink2">{party.role}</span>
+              </span>
+              {party.signedAt ? (
+                <span className="text-[12.5px] font-medium text-[#2E9E5B]">✓ {party.signedAt}</span>
+              ) : (
+                <span className="rounded-full bg-[#F6EFD9] px-2 py-0.5 text-[12px] font-medium text-[#8A6B2E]">
+                  Kutilmoqda
+                </span>
+              )}
+            </li>
+          ))}
+          <li className="flex min-h-12 items-center gap-3 px-4 py-2">
+            <span className="flex h-12 w-12 items-center justify-center rounded-full bg-[#F6EFD9] text-[22px]">🤖</span>
+            <span className="min-w-0 flex-1">
+              <span className="block text-[15px] font-medium text-ink">Ahd AI</span>
+              <span className="block text-[13px] text-ink2">Yordamchi</span>
+            </span>
+          </li>
+        </ul>
+      </InfoDrawer>
+    </div>
+  );
+
+  function renderMessage(message: ChatMessage) {
+    if (!deal) return null;
+    if (message.side === "system") return <SystemMessage id={message.id} text={message.text} />;
+    if (message.kind === "agreement") {
+      return (
+        <AgreementCard
+          id={message.id}
+          deal={deal}
+          time={message.time}
+          onView={() => setDrawer("doc")}
+          onSign={signNext}
+        />
+      );
+    }
+    if (message.kind === "signature") {
+      return <SignatureCard id={message.id} deal={deal} time={message.time} onSign={signNext} />;
+    }
+    const side = message.side === "me" ? "me" : "them";
+    if (message.kind === "file") {
+      return (
+        <Bubble id={message.id} side={side} name={message.author} nameColor={nameColor(message.author)} time={message.time}>
+          <div className="flex items-center gap-2.5 py-1">
+            <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-[8px] bg-white/15 text-[#C9A84C]">
+              <Paperclip size={18} />
+            </span>
+            <span className="min-w-0 break-anywhere text-[14px]">{message.text}</span>
+          </div>
+        </Bubble>
+      );
+    }
+    return (
+      <Bubble
+        id={message.id}
+        side={side}
+        name={message.author}
+        nameColor={message.kind === "ai" ? "#8A6B2E" : nameColor(message.author)}
+        time={message.time}
+      >
+        <p className="text-[14.5px] leading-[1.4] break-anywhere whitespace-pre-wrap">
+          {message.kind === "ai" ? "🤖 " : ""}
+          {message.text}
+        </p>
+      </Bubble>
+    );
+  }
+}
