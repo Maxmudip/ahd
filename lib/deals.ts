@@ -1,4 +1,21 @@
-export type DealStatus = "draft" | "discussion" | "signing" | "completed";
+export type DealStatus = "draft" | "pending" | "rejected" | "discussion" | "signing" | "completed";
+
+export type InitiatorRole = "mijoz" | "ijrochi" | "qarz_beruvchi" | "qarz_oluvchi";
+
+export type InviteStatus = "pending" | "accepted" | "rejected";
+
+export type DealInvitation = {
+  id: string;
+  email: string;
+  userId: string | null;
+  status: InviteStatus;
+  createdAt: string;
+};
+
+/** Chat is open for both parties. Pending/rejected invitations have no chat. */
+export function isDealActive(status: DealStatus) {
+  return status === "discussion" || status === "signing" || status === "completed";
+}
 
 export type Party = {
   name: string;
@@ -55,10 +72,17 @@ export type Deal = {
   parties: Party[];
   messages: ChatMessage[];
   agreement: AgreementDocument | null;
+  createdBy?: string;
+  initiatorRole?: InitiatorRole | null;
+  invitation?: DealInvitation | null;
+  /** True when this row is an incoming invite the signed-in user has not answered yet. */
+  incomingInvite?: boolean;
 };
 
 export const STATUS_LABEL: Record<DealStatus, string> = {
   draft: "Qoralama",
+  pending: "Kutilmoqda",
+  rejected: "Rad etildi",
   discussion: "Muhokama",
   signing: "Imzolash",
   completed: "Yakunlangan",

@@ -23,6 +23,7 @@ import {
   TypingBubble,
   type PillItem,
 } from "@/components/chat-ui";
+import { DealGate } from "@/components/deal-invite";
 import { KindBadge } from "@/components/kind-badge";
 import { StatusBadge } from "@/components/status-badge";
 import { formatFileSize, freshId, initialsOf, nameColor } from "@/lib/chat-helpers";
@@ -31,6 +32,7 @@ import { downloadAgreementPdf } from "@/lib/export-agreement-pdf";
 import {
   STATUS_LABEL,
   formatUzDate,
+  isDealActive,
   nowTime,
   type ChatMessage,
 } from "@/lib/deals";
@@ -45,7 +47,7 @@ export default function DealChatPage() {
   const params = useParams<{ id: string }>();
   const id = params.id;
   const router = useRouter();
-  const { me, deals, hydrated, updateDeal, markRead, archived, toggleArchive } = useApp();
+  const { me, deals, hydrated, updateDeal, markRead, archived, toggleArchive, respondToInvite, resendInvite } = useApp();
   const deal = deals.find((d) => d.id === id) ?? null;
 
   const [draft, setDraft] = useState("");
@@ -91,7 +93,7 @@ export default function DealChatPage() {
     lastRealCount.current = { id: dealId, count: realCount };
     // First sight of this chat only sets the baseline, so opening a chat never triggers the AI.
     if (!prev || prev.id !== dealId) return;
-    if (hasAgreement || mediatingRef.current) return;
+    if (hasAgreement || mediatingRef.current || !isDealActive(deal?.status ?? "pending")) return;
     if (Math.floor(realCount / 3) <= Math.floor(prev.count / 3)) return;
 
     mediatingRef.current = true;
@@ -123,7 +125,7 @@ export default function DealChatPage() {
         setMediating(null);
       }
     })();
-  }, [dealId, realCount, realMessages, hasAgreement]);
+  }, [dealId, realCount, realMessages, hasAgreement, deal?.status]);
 
   const canGenerate = useMemo(
     () => Boolean(deal?.messages.some((m) => m.side !== "system" && !m.kind)),
@@ -333,6 +335,29 @@ export default function DealChatPage() {
 
   const isArchived = archived.includes(deal.id);
   const kind = deal.kind ?? "kelishuv";
+  const chatOpen = isDealActive(deal.status) && !deal.incomingInvite;
+
+  if (!chatOpen) {
+    return (
+      <div className="relative flex h-full min-h-0 flex-1 flex-col overflow-hidden">
+        <ChatHeader
+          back="/dashboard"
+          avatar={<Avatar initials={initialsOf(deal.counterparty)} size="hd" />}
+          title={deal.title}
+          subtitle={deal.counterparty}
+          center={<KindBadge kind={kind} />}
+          actions={null}
+        />
+        <DealGate
+          deal={deal}
+          meName={me.name}
+          onAccept={() => (deal.invitation ? respondToInvite(deal.invitation.id, true) : Promise.resolve())}
+          onReject={() => (deal.invitation ? respondToInvite(deal.invitation.id, false) : Promise.resolve())}
+          onResend={(email) => resendInvite(deal.id, email)}
+        />
+      </div>
+    );
+  }
 
   const plusItems: PillItem[] = [
     { label: "📄 Kelishuv yaratish", onClick: () => void generate(), disabled: !canGenerate || busy !== null },

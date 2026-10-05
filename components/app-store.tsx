@@ -19,6 +19,8 @@ import {
   insertPool,
   mapMessage,
   personFromSession,
+  resendInvitation,
+  respondToInvitation,
   saveDealChange,
   savePoolChange,
   type MessageRow,
@@ -81,6 +83,10 @@ type AppStore = {
   setTheme: (theme: Theme) => void;
   openNewChat: (seed?: string) => void;
   closeNewChat: () => void;
+  /** Incoming invitations the signed-in user has not answered yet. */
+  incomingInvites: Deal[];
+  respondToInvite: (invitationId: string, accept: boolean) => Promise<void>;
+  resendInvite: (dealId: string, email: string) => Promise<void>;
 };
 
 const AppContext = createContext<AppStore | null>(null);
@@ -244,6 +250,7 @@ export function AppProvider({ user, children }: { user: SessionUser; children: R
       .on("postgres_changes", { event: "*", schema: "public", table: "deal_rooms" }, scheduleRefresh)
       .on("postgres_changes", { event: "*", schema: "public", table: "deal_participants" }, scheduleRefresh)
       .on("postgres_changes", { event: "*", schema: "public", table: "agreements" }, scheduleRefresh)
+      .on("postgres_changes", { event: "*", schema: "public", table: "deal_invitations" }, scheduleRefresh)
       .on("postgres_changes", { event: "*", schema: "public", table: "pool_qarz_requests" }, scheduleRefresh)
       .on("postgres_changes", { event: "INSERT", schema: "public", table: "pool_qarz_contributions" }, (payload) => {
         const row = payload.new as { request_id: string; contributor_id: string };
@@ -367,6 +374,34 @@ export function AppProvider({ user, children }: { user: SessionUser; children: R
   );
   const closeNewChat = useCallback(() => setNewChat((current) => ({ ...current, open: false })), []);
 
+  const incomingInvites = useMemo(() => deals.filter((d) => d.incomingInvite), [deals]);
+
+  const respondToInvite = useCallback(
+    async (invitationId: string, accept: boolean) => {
+      try {
+        await respondToInvitation(supabase, invitationId, accept);
+        await load();
+      } catch (error) {
+        setSyncError(explainError(error));
+        throw error;
+      }
+    },
+    [supabase, load],
+  );
+
+  const resendInvite = useCallback(
+    async (dealId: string, email: string) => {
+      try {
+        await resendInvitation(supabase, dealId, email);
+        await load();
+      } catch (error) {
+        setSyncError(explainError(error));
+        throw error;
+      }
+    },
+    [supabase, load],
+  );
+
   const value = useMemo<AppStore>(
     () => ({
       me,
@@ -396,6 +431,9 @@ export function AppProvider({ user, children }: { user: SessionUser; children: R
       setTheme,
       openNewChat,
       closeNewChat,
+      incomingInvites,
+      respondToInvite,
+      resendInvite,
     }),
     [
       me,
@@ -424,6 +462,9 @@ export function AppProvider({ user, children }: { user: SessionUser; children: R
       setTheme,
       openNewChat,
       closeNewChat,
+      incomingInvites,
+      respondToInvite,
+      resendInvite,
     ],
   );
 

@@ -3,6 +3,7 @@
 import { usePathname } from "next/navigation";
 import { useEffect, useRef, type CSSProperties, type ReactNode } from "react";
 import { useApp } from "@/components/app-store";
+import { InviteActions } from "@/components/deal-invite";
 import { LeftPanel } from "@/components/left-panel";
 import { MobileTabBar } from "@/components/mobile-tab-bar";
 import { SidebarResizer, useSidebarWidth } from "@/components/sidebar-resizer";
@@ -16,7 +17,9 @@ import { useIsMobile, useWindowSize } from "@/hooks/use-window-size";
  */
 export function ChatShell({ children }: { children: ReactNode }) {
   const pathname = usePathname();
-  const { theme, closing, syncError, dismissSyncError } = useApp();
+  const { theme, closing, syncError, dismissSyncError, incomingInvites, respondToInvite } = useApp();
+  const banner = incomingInvites[0] ?? null;
+  const from = banner?.parties.find((p) => p.userId === banner.createdBy)?.name || banner?.title || "";
   const { height } = useWindowSize();
   const isMobile = useIsMobile();
   const sidebarWidth = useSidebarWidth();
@@ -56,6 +59,23 @@ export function ChatShell({ children }: { children: ReactNode }) {
           </div>
         </main>
       </div>
+      {banner && !syncError ? (
+        <div
+          role="status"
+          className="fixed top-3 left-1/2 z-50 w-[min(92vw,520px)] -translate-x-1/2 rounded-[10px] border border-[#E6D9AE] bg-[#FFFBEB] px-4 py-3 text-[#3B2F0B] shadow-[0_6px_24px_rgba(0,0,0,0.12)]"
+        >
+          <p className="text-[13.5px] leading-5">
+            <span className="font-semibold">{from}</span> sizni kelishuvga taklif qildi
+            {banner.title ? <span className="text-[#7A6A3A]"> — {banner.title}</span> : null}
+          </p>
+          <div className="mt-2.5">
+            <InviteActions
+              onAccept={() => banner.invitation && respondToInvite(banner.invitation.id, true)}
+              onReject={() => banner.invitation && respondToInvite(banner.invitation.id, false)}
+            />
+          </div>
+        </div>
+      ) : null}
       {syncError ? (
         <div
           role="alert"

@@ -7,6 +7,7 @@ import { CheckCheck, FileText, Paperclip, PenLine, Search, Settings, SquarePen, 
 import { Avatar, GroupAvatar } from "@/components/avatar";
 import { useApp, type ListTab } from "@/components/app-store";
 import { EmptyNote, IconButton } from "@/components/chat-ui";
+import { InviteActions } from "@/components/deal-invite";
 import { KindBadge, type ChatKind } from "@/components/kind-badge";
 import { Logo } from "@/components/logo";
 import { NewChatPanel } from "@/components/new-chat-panel";
@@ -16,7 +17,7 @@ import type { PoolRequest } from "@/lib/pool-qarz";
 
 type Row = {
   id: string;
-  kind: "deal" | "pool";
+  kind: "deal" | "pool" | "invite";
   /** Chat type shown as a chip: Kelishuv, Qarz or Pool Qarz. */
   chatKind: ChatKind;
   href: string;
@@ -26,6 +27,9 @@ type Row = {
   preview: ReactNode;
   unread: number;
   hay: string;
+  pending?: boolean;
+  rejected?: boolean;
+  inviteDeal?: Deal;
 };
 
 const TABS: { id: ListTab; label: string }[] = [
@@ -44,6 +48,23 @@ function Preview({ icon, children }: { icon?: ReactNode; children: ReactNode }) 
 }
 
 function dealPreview(deal: Deal): ReactNode {
+  if (deal.incomingInvite) {
+    return <Preview>📨 Taklif — qabul qiling yoki rad eting</Preview>;
+  }
+  if (deal.status === "pending") {
+    return (
+      <Preview>
+        <span className="text-[#8A6B2E]">⏳ Javob kutilmoqda</span>
+      </Preview>
+    );
+  }
+  if (deal.status === "rejected") {
+    return (
+      <Preview>
+        <span className="text-[#C4554D]">Taklif rad etildi</span>
+      </Preview>
+    );
+  }
   const last = deal.messages[deal.messages.length - 1];
   if (deal.status === "completed") {
     return (
@@ -81,21 +102,38 @@ function poolPreview(pool: PoolRequest): ReactNode {
 
 export function LeftPanel() {
   const pathname = usePathname();
-  const { me, deals, pools, unread, archived, openNewChat, listTab: tab, setListTab: setTab } = useApp();
+  const { me, deals, pools, unread, archived, openNewChat, listTab: tab, setListTab: setTab, incomingInvites, respondToInvite } = useApp();
   const [query, setQuery] = useState("");
 
   const rows = useMemo<Row[]>(() => {
-    const dealRows: Row[] = deals.map((deal) => ({
+    const dealRows: Row[] = deals
+      .filter((deal) => !deal.incomingInvite)
+      .map((deal) => ({
+        id: deal.id,
+        kind: "deal",
+        chatKind: deal.kind ?? "kelishuv",
+        href: `/dashboard/deals/${deal.id}`,
+        avatar: <Avatar initials={initialsOf(deal.counterparty)} size="xl" />,
+        name: deal.title,
+        time: listTime(deal.updatedAt),
+        preview: dealPreview(deal),
+        unread: unread[deal.id] ?? 0,
+        hay: `${deal.title} ${deal.counterparty}`.toLowerCase(),
+        pending: deal.status === "pending",
+        rejected: deal.status === "rejected",
+      }));
+    const inviteRows: Row[] = incomingInvites.map((deal) => ({
       id: deal.id,
-      kind: "deal",
+      kind: "invite",
       chatKind: deal.kind ?? "kelishuv",
       href: `/dashboard/deals/${deal.id}`,
-      avatar: <Avatar initials={initialsOf(deal.counterparty)} size="xl" />,
-      name: deal.title,
+      avatar: <Avatar initials={initialsOf(deal.parties[0]?.name || deal.counterparty)} size="xl" />,
+      name: deal.parties.find((p) => p.userId === deal.createdBy)?.name || deal.title,
       time: listTime(deal.updatedAt),
       preview: dealPreview(deal),
-      unread: unread[deal.id] ?? 0,
+      unread: 0,
       hay: `${deal.title} ${deal.counterparty}`.toLowerCase(),
+      inviteDeal: deal,
     }));
     const poolRows: Row[] = pools.map((pool) => {
       const second = pool.contributors[0]?.person ?? pool.invited[0] ?? pool.borrower;
@@ -112,10 +150,10 @@ export function LeftPanel() {
         hay: `${pool.borrower.name} ${pool.purpose}`.toLowerCase(),
       };
     });
-    if (tab === "deals") return dealRows.filter((r) => !archived.includes(r.id));
+    if (tab === "deals") return [...inviteRows, ...dealRows].filter((r) => !archived.includes(r.id));
     if (tab === "pools") return poolRows.filter((r) => !archived.includes(r.id));
     return [...dealRows, ...poolRows].filter((r) => archived.includes(r.id));
-  }, [deals, pools, unread, archived, tab]);
+  }, [deals, pools, unread, archived, tab, incomingInvites]);
 
   const q = query.trim().toLowerCase();
   const visible = q ? rows.filter((r) => r.hay.includes(q)) : rows;
@@ -156,6 +194,11 @@ export function LeftPanel() {
             }`}
           >
             {item.label}
+            {item.id === "deals" && incomingInvites.length > 0 ? (
+              <span className="ml-1.5 inline-flex h-4 min-w-4 items-center justify-center rounded-full bg-[#C9A84C] px-1 text-[10px] font-semibold text-[#111]">
+                {incomingInvites.length}
+              </span>
+            ) : null}
           </button>
         ))}
       </div>
@@ -178,37 +221,78 @@ export function LeftPanel() {
           </Link>
         ) : null}
 
-        {visible.map((row) => (
-          <Link
-            key={row.id}
-            href={row.href}
-            className={`flex h-[72px] items-center gap-3 px-3 ${pathname === row.href ? "bg-sel" : "hover:bg-hov"}`}
-          >
-            {row.avatar}
-            <span className="min-w-0 flex-1">
-              <span className="flex items-baseline justify-between gap-2">
-                <span className="flex min-w-0 items-center gap-1.5">
-                  <span className="truncate text-[15px] font-semibold text-ink">{row.name}</span>
-                  <KindBadge kind={row.chatKind} size="sm" />
-                </span>
-                <span className={`shrink-0 text-[12px] ${row.unread ? "font-semibold text-ink" : "text-ink2"}`}>
-                  {row.time}
-                </span>
-              </span>
-              <span className="mt-0.5 flex items-center gap-2">
-                <span className="flex min-w-0 flex-1 text-[13.5px] text-ink2">{row.preview}</span>
-                {row.unread > 0 ? (
-                  <span
-                    aria-label={`${row.unread} ta o'qilmagan`}
-                    className="inline-flex h-5 min-w-5 shrink-0 items-center justify-center rounded-full bg-badge px-1.5 text-[11px] font-semibold text-badgeink"
-                  >
-                    {row.unread}
+        {visible.map((row) =>
+          row.kind === "invite" && row.inviteDeal ? (
+            <div
+              key={row.id}
+              className="border-l-[3px] border-l-[#C9A84C] bg-[#FFFBEB] px-3 py-2.5"
+            >
+              <div className="flex items-center gap-3">
+                {row.avatar}
+                <span className="min-w-0 flex-1">
+                  <span className="flex items-baseline justify-between gap-2">
+                    <span className="flex min-w-0 items-center gap-1.5">
+                      <span className="truncate text-[15px] font-semibold text-ink">{row.name}</span>
+                      <span className="shrink-0 rounded-[3px] bg-[#C9A84C] px-1.5 py-px text-[10.5px] font-semibold text-[#111]">
+                        📨 Taklif
+                      </span>
+                    </span>
+                    <span className="shrink-0 text-[12px] text-ink2">{row.time}</span>
                   </span>
-                ) : null}
+                  <span className="mt-0.5 flex items-center gap-1.5 text-[13px] text-ink2">
+                    <KindBadge kind={row.chatKind} size="sm" />
+                    <span className="truncate">{row.inviteDeal.title}</span>
+                  </span>
+                </span>
+              </div>
+              <div className="mt-2 pl-[60px]">
+                <InviteActions
+                  onAccept={() => row.inviteDeal?.invitation && void respondToInvite(row.inviteDeal.invitation.id, true)}
+                  onReject={() => row.inviteDeal?.invitation && void respondToInvite(row.inviteDeal.invitation.id, false)}
+                />
+              </div>
+            </div>
+          ) : (
+            <Link
+              key={row.id}
+              href={row.href}
+              className={`flex min-h-[72px] items-center gap-3 px-3 ${
+                row.pending ? "border-l-[3px] border-l-[#C9A84C] bg-[#FFFBEB]" : ""
+              } ${row.rejected ? "border-l-[3px] border-l-[#E8B4B0]" : ""} ${
+                pathname === row.href ? "bg-sel" : "hover:bg-hov"
+              }`}
+            >
+              {row.avatar}
+              <span className="min-w-0 flex-1">
+                <span className="flex items-baseline justify-between gap-2">
+                  <span className="flex min-w-0 items-center gap-1.5">
+                    <span className="truncate text-[15px] font-semibold text-ink">{row.name}</span>
+                    <KindBadge kind={row.chatKind} size="sm" />
+                    {row.pending ? (
+                      <span className="shrink-0 rounded-[3px] bg-[#F6EFD9] px-1.5 py-px text-[10.5px] font-medium text-[#8A6B2E]">
+                        ⏳ Javob kutilmoqda
+                      </span>
+                    ) : null}
+                  </span>
+                  <span className={`shrink-0 text-[12px] ${row.unread ? "font-semibold text-ink" : "text-ink2"}`}>
+                    {row.time}
+                  </span>
+                </span>
+                <span className="mt-0.5 flex items-center gap-2">
+                  <span className="flex min-w-0 flex-1 text-[13.5px] text-ink2">{row.preview}</span>
+                  {row.unread > 0 ? (
+                    <span
+                      aria-label={`${row.unread} ta o'qilmagan`}
+                      className="inline-flex h-5 min-w-5 shrink-0 items-center justify-center rounded-full bg-badge px-1.5 text-[11px] font-semibold text-badgeink"
+                    >
+                      {row.unread}
+                    </span>
+                  ) : null}
+                </span>
               </span>
-            </span>
-          </Link>
-        ))}
+            </Link>
+          ),
+        )}
 
         {visible.length === 0 ? (
           <EmptyNote emoji={tab === "archive" ? "🗂️" : "💬"}>

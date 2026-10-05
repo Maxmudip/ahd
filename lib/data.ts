@@ -7,8 +7,11 @@ import {
   type ChatMessage,
   type Clause,
   type Deal,
+  type DealInvitation,
   type DealKind,
   type DealStatus,
+  type InitiatorRole,
+  type InviteStatus,
   type MessageKind,
   type Party,
 } from "@/lib/deals";
@@ -39,6 +42,16 @@ type DealRoomRow = {
   created_by: string;
   created_at: string;
   updated_at: string;
+  initiator_role?: InitiatorRole | null;
+};
+type InvitationRow = {
+  id: string;
+  deal_room_id: string;
+  invited_email: string;
+  invited_user_id: string | null;
+  status: InviteStatus;
+  created_at: string;
+  responded_at: string | null;
 };
 type ParticipantRow = {
   id: string;
@@ -108,7 +121,7 @@ type PgError = { code?: string; message: string };
 export function explainError(error: unknown): string {
   const e = (error ?? {}) as Partial<PgError>;
   if (e.code === "PGRST205" || e.code === "42P01") {
-    return "Ma'lumotlar bazasi hali sozlanmagan: supabase/migrations/20261003000000_init.sql faylini Supabase SQL Editor'da ishga tushiring.";
+    return "Ma'lumotlar bazasi hali sozlanmagan: supabase/migrations/ ichidagi SQL fayllarni (init, keyin deal_invitations) Supabase SQL Editor'da ishga tushiring.";
   }
   if (e.code === "42501" || e.message?.includes("row-level security")) {
     return e.message?.includes("imzoni") ? e.message : "Bu amal uchun ruxsat yo'q.";
@@ -128,11 +141,23 @@ function must<T>(result: { data: T | null; error: PgError | null }): T {
 
 export function personFromUser(user: UserRow): Person {
   const name = user.full_name?.trim() || user.email?.split("@")[0] || "Foydalanuvchi";
-  return { id: user.id, name, phone: user.phone || user.email || "", initials: initialsOf(name) };
+  return {
+    id: user.id,
+    name,
+    phone: user.phone || user.email || "",
+    email: user.email ?? "",
+    initials: initialsOf(name),
+  };
 }
 
 export function personFromSession(user: SessionUser): Person {
-  return { id: user.id, name: user.name, phone: user.phone || user.email, initials: initialsOf(user.name) };
+  return {
+    id: user.id,
+    name: user.name,
+    phone: user.phone || user.email,
+    email: user.email,
+    initials: initialsOf(user.name),
+  };
 }
 
 const num = (value: number | string) => Number(value) || 0;
@@ -187,26 +212,47 @@ function mapAgreement(row: AgreementRow, parties: Party[]): AgreementDocument {
   };
 }
 
+function mapInvitation(row: InvitationRow): DealInvitation {
+  return {
+    id: row.id,
+    email: row.invited_email,
+    userId: row.invited_user_id,
+    status: row.status,
+    createdAt: row.created_at,
+  };
+}
+
 function buildDeal(
   room: DealRoomRow,
   participants: ParticipantRow[],
   messages: MessageRow[],
   agreement: AgreementRow | undefined,
+  invitation: InvitationRow | undefined,
   meId: string,
+  meEmail: string,
   now: Date,
 ): Deal {
   const parties = [...participants].sort((a, b) => a.position - b.position).map(mapParty);
   const others = parties.filter((p) => p.userId !== meId).map((p) => p.name);
+  const incoming =
+    Boolean(invitation) &&
+    invitation!.status === "pending" &&
+    room.created_by !== meId &&
+    (invitation!.invited_user_id === meId || invitation!.invited_email.toLowerCase() === meEmail.toLowerCase());
   return {
     id: room.id,
     title: room.title,
-    counterparty: others.join(", ") || room.counterparty,
+    counterparty: others.join(", ") || room.counterparty || invitation?.invited_email || "",
     kind: room.kind,
     status: room.status,
     updatedAt: stampLabel(new Date(room.updated_at), now),
     parties,
-    messages: messages.map((m) => mapMessage(m, meId, now)),
-    agreement: agreement ? mapAgreement(agreement, parties) : null,
+    messages: incoming ? [] : messages.map((m) => mapMessage(m, meId, now)),
+    agreement: incoming ? null : agreement ? mapAgreement(agreement, parties) : null,
+    createdBy: room.created_by,
+    initiatorRole: room.initiator_role ?? null,
+    invitation: invitation ? mapInvitation(invitation) : null,
+    incomingInvite: incoming,
   };
 }
 
@@ -298,7 +344,7 @@ function groupBy<T>(rows: T[], key: (row: T) => string) {
 
 /** Everything the signed-in user can see (Row Level Security does the filtering). */
 export async function fetchAppData(sb: SupabaseClient, me: SessionUser): Promise<AppData> {
-  const [users, rooms, participants, messages, agreements, pools, contributions] = await Promise.all([
+  const [users, rooms, participants, messages, agreements, pools, contributions, invitations] = await Promise.all([
     sb.from("users").select("id, full_name, email, phone").then((r) => must<UserRow[]>(r)),
     sb.from("deal_rooms").select("*").order("updated_at", { ascending: false }).then((r) => must<DealRoomRow[]>(r)),
     sb.from("deal_participants").select("*").then((r) => must<ParticipantRow[]>(r)),
@@ -310,6 +356,11 @@ export async function fetchAppData(sb: SupabaseClient, me: SessionUser): Promise
     fetchAllRows<ContributionRow>((from, to) =>
       sb.from("pool_qarz_contributions").select("*").order("created_at", { ascending: true }).order("id").range(from, to),
     ),
+    sb.from("deal_invitations").select("*").order("created_at", { ascending: false }).then((r) => {
+      // Older databases without this table still load the rest of the app.
+      if (r.error && (r.error.code === "PGRST205" || r.error.code === "42P01")) return [] as InvitationRow[];
+      return must<InvitationRow[]>(r);
+    }),
   ]);
 
   const now = new Date();
@@ -320,10 +371,24 @@ export async function fetchAppData(sb: SupabaseClient, me: SessionUser): Promise
   const msgsByDeal = groupBy(messages, (m) => m.deal_id);
   const agreementByDeal = new Map(agreements.map((a) => [a.deal_id, a]));
   const contribByPool = groupBy(contributions, (c) => c.request_id);
+  const inviteByDeal = new Map<string, InvitationRow>();
+  for (const inv of invitations) {
+    const prev = inviteByDeal.get(inv.deal_room_id);
+    if (!prev || inv.created_at > prev.created_at) inviteByDeal.set(inv.deal_room_id, inv);
+  }
 
   return {
     deals: rooms.map((room) =>
-      buildDeal(room, partsByDeal.get(room.id) ?? [], msgsByDeal.get(room.id) ?? [], agreementByDeal.get(room.id), me.id, now),
+      buildDeal(
+        room,
+        partsByDeal.get(room.id) ?? [],
+        msgsByDeal.get(room.id) ?? [],
+        agreementByDeal.get(room.id),
+        inviteByDeal.get(room.id),
+        me.id,
+        me.email,
+        now,
+      ),
     ),
     pools: pools.map((row) => buildPool(row, contribByPool.get(row.id) ?? [], person, me.id, now)),
     contacts: users.filter((u) => u.id !== me.id).map(personFromUser).sort((a, b) => a.name.localeCompare(b.name)),
@@ -356,7 +421,7 @@ function check(result: { error: PgError | null }) {
   if (result.error) throw result.error;
 }
 
-/** Creates a deal room with its participants and first messages. */
+/** Creates a deal room with its participants, first messages and (optionally) a pending invitation. */
 export async function insertDeal(sb: SupabaseClient, me: SessionUser, deal: Deal) {
   check(
     await sb.from("deal_rooms").insert({
@@ -366,6 +431,7 @@ export async function insertDeal(sb: SupabaseClient, me: SessionUser, deal: Deal
       kind: deal.kind ?? "kelishuv",
       status: deal.status,
       created_by: me.id,
+      initiator_role: deal.initiatorRole ?? null,
     }),
   );
   check(
@@ -388,6 +454,39 @@ export async function insertDeal(sb: SupabaseClient, me: SessionUser, deal: Deal
         .insert(deal.messages.map((m, i) => messageRow(m, deal.id, me.id, new Date(base + i)))),
     );
   }
+  if (deal.invitation) {
+    const email = deal.invitation.email.trim().toLowerCase();
+    const { data: match } = await sb.from("users").select("id").ilike("email", email).maybeSingle();
+    check(
+      await sb.from("deal_invitations").insert({
+        id: deal.invitation.id,
+        deal_room_id: deal.id,
+        invited_email: email,
+        invited_user_id: match?.id ?? deal.invitation.userId ?? null,
+        status: "pending",
+      }),
+    );
+  }
+}
+
+/** Invitee accepts or rejects. The database function adds them as a participant on accept. */
+export async function respondToInvitation(sb: SupabaseClient, invitationId: string, accept: boolean) {
+  check(await sb.rpc("respond_to_deal_invitation", { p_invite: invitationId, p_accept: accept }));
+}
+
+/** After a rejection, the initiator can send the invite to a (possibly different) email. */
+export async function resendInvitation(sb: SupabaseClient, dealId: string, email: string) {
+  const trimmed = email.trim().toLowerCase();
+  const { data: match } = await sb.from("users").select("id").ilike("email", trimmed).maybeSingle();
+  check(await sb.from("deal_rooms").update({ status: "pending", counterparty: trimmed }).eq("id", dealId));
+  check(
+    await sb.from("deal_invitations").insert({
+      deal_room_id: dealId,
+      invited_email: trimmed,
+      invited_user_id: match?.id ?? null,
+      status: "pending",
+    }),
+  );
 }
 
 /** Persists the difference between two versions of one deal (new/removed messages, agreement, signatures, status). */
