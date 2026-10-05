@@ -119,15 +119,23 @@ type PgError = { code?: string; message: string };
 
 /** Human readable (Uzbek) explanation of a Supabase / network error. */
 export function explainError(error: unknown): string {
-  const e = (error ?? {}) as Partial<PgError>;
-  if (e.code === "PGRST205" || e.code === "42P01") {
-    return "Ma'lumotlar bazasi hali sozlanmagan: supabase/migrations/ ichidagi SQL fayllarni (init, keyin deal_invitations) Supabase SQL Editor'da ishga tushiring.";
+  const e = (error ?? {}) as Partial<PgError> & { details?: string; hint?: string };
+  const text = `${e.message ?? ""} ${e.details ?? ""} ${e.hint ?? ""}`.toLowerCase();
+  if (e.code === "PGRST205" || e.code === "42P01" || text.includes("deal_invitations")) {
+    return "deal_invitations jadvali yo'q. Supabase SQL Editor'da supabase/migrations/20261006000000_deal_invitations.sql ni ishga tushiring.";
   }
-  if (e.code === "42501" || e.message?.includes("row-level security")) {
-    return e.message?.includes("imzoni") ? e.message : "Bu amal uchun ruxsat yo'q.";
+  if (e.code === "PGRST204" || text.includes("initiator_role")) {
+    return "deal_rooms.initiator_role ustuni yo'q. Shu SQL faylini (deal_invitations) ishga tushiring.";
   }
-  if (e.message?.toLowerCase().includes("failed to fetch")) return "Internetga ulanib bo'lmadi.";
-  return e.message || "Kutilmagan xatolik yuz berdi.";
+  if (e.code === "23514" || text.includes("deal_rooms_status_check")) {
+    return "deal_rooms.status hali 'pending' qiymatini qabul qilmaydi. deal_invitations SQL ni ishga tushiring.";
+  }
+  if (e.code === "42501" || text.includes("row-level security")) {
+    return e.message?.includes("imzoni") ? e.message : "Bu amal uchun ruxsat yo'q (RLS).";
+  }
+  if (text.includes("failed to fetch")) return "Internetga ulanib bo'lmadi.";
+  const detail = [e.code, e.message, e.details].filter(Boolean).join(" · ");
+  return detail || "Kutilmagan xatolik yuz berdi.";
 }
 
 function must<T>(result: { data: T | null; error: PgError | null }): T {
@@ -357,9 +365,12 @@ export async function fetchAppData(sb: SupabaseClient, me: SessionUser): Promise
       sb.from("pool_qarz_contributions").select("*").order("created_at", { ascending: true }).order("id").range(from, to),
     ),
     sb.from("deal_invitations").select("*").order("created_at", { ascending: false }).then((r) => {
-      // Older databases without this table still load the rest of the app.
-      if (r.error && (r.error.code === "PGRST205" || r.error.code === "42P01")) return [] as InvitationRow[];
-      return must<InvitationRow[]>(r);
+      // Missing table / RLS must not wipe the deal list — that was making new pending chats vanish.
+      if (r.error) {
+        console.warn("[fetchAppData] deal_invitations:", r.error.code, r.error.message);
+        return [] as InvitationRow[];
+      }
+      return (r.data ?? []) as InvitationRow[];
     }),
   ]);
 
@@ -423,49 +434,90 @@ function check(result: { error: PgError | null }) {
 
 /** Creates a deal room with its participants, first messages and (optionally) a pending invitation. */
 export async function insertDeal(sb: SupabaseClient, me: SessionUser, deal: Deal) {
-  check(
-    await sb.from("deal_rooms").insert({
+  const payload = {
+    id: deal.id,
+    title: deal.title,
+    status: deal.status,
+    initiatorRole: deal.initiatorRole ?? null,
+    inviteEmail: deal.invitation?.email ?? null,
+  };
+  console.log("[insertDeal] start", payload);
+
+  const roomFull = {
+    id: deal.id,
+    title: deal.title,
+    counterparty: deal.counterparty,
+    kind: deal.kind ?? "kelishuv",
+    status: deal.status,
+    created_by: me.id,
+    initiator_role: deal.initiatorRole ?? null,
+  };
+  let room = await sb.from("deal_rooms").insert(roomFull);
+  if (room.error) {
+    console.error("[insertDeal] deal_rooms (full) failed:", room.error.code, room.error.message, room.error.details);
+    // Schema not migrated yet: still persist the room so it does not vanish from the list.
+    const fallbackStatus = deal.status === "pending" || deal.status === "rejected" ? "discussion" : deal.status;
+    room = await sb.from("deal_rooms").insert({
       id: deal.id,
       title: deal.title,
       counterparty: deal.counterparty,
       kind: deal.kind ?? "kelishuv",
-      status: deal.status,
+      status: fallbackStatus,
       created_by: me.id,
-      initiator_role: deal.initiatorRole ?? null,
-    }),
+    });
+    if (room.error) {
+      console.error("[insertDeal] deal_rooms (fallback) failed:", room.error.code, room.error.message);
+      throw room.error;
+    }
+    console.warn("[insertDeal] room saved without pending/initiator_role — run 20261006000000_deal_invitations.sql");
+  } else {
+    console.log("[insertDeal] deal_rooms saved", deal.id, deal.status);
+  }
+
+  const parts = await sb.from("deal_participants").insert(
+    deal.parties.map((party, position) => ({
+      deal_id: deal.id,
+      user_id: party.userId ?? null,
+      name: party.name,
+      role: party.role,
+      position,
+      signed_at: null,
+    })),
   );
-  check(
-    await sb.from("deal_participants").insert(
-      deal.parties.map((party, position) => ({
-        deal_id: deal.id,
-        user_id: party.userId ?? null,
-        name: party.name,
-        role: party.role,
-        position,
-        signed_at: null,
-      })),
-    ),
-  );
+  if (parts.error) {
+    console.error("[insertDeal] participants failed:", parts.error);
+    throw parts.error;
+  }
+
   if (deal.messages.length) {
     const base = Date.now();
-    check(
-      await sb
-        .from("messages")
-        .insert(deal.messages.map((m, i) => messageRow(m, deal.id, me.id, new Date(base + i)))),
-    );
+    const msgs = await sb
+      .from("messages")
+      .insert(deal.messages.map((m, i) => messageRow(m, deal.id, me.id, new Date(base + i))));
+    if (msgs.error) {
+      console.error("[insertDeal] messages failed:", msgs.error);
+      throw msgs.error;
+    }
   }
+
   if (deal.invitation) {
     const email = deal.invitation.email.trim().toLowerCase();
-    const { data: match } = await sb.from("users").select("id").ilike("email", email).maybeSingle();
-    check(
-      await sb.from("deal_invitations").insert({
-        id: deal.invitation.id,
-        deal_room_id: deal.id,
-        invited_email: email,
-        invited_user_id: match?.id ?? deal.invitation.userId ?? null,
-        status: "pending",
-      }),
-    );
+    const { data: match, error: lookupError } = await sb.from("users").select("id").ilike("email", email).maybeSingle();
+    if (lookupError) console.warn("[insertDeal] email lookup:", lookupError.message);
+    const inviteRow = {
+      id: deal.invitation.id,
+      deal_room_id: deal.id,
+      invited_email: email,
+      invited_user_id: match?.id ?? deal.invitation.userId ?? null,
+      status: "pending" as const,
+    };
+    console.log("[insertDeal] writing invitation", inviteRow);
+    const inv = await sb.from("deal_invitations").insert(inviteRow);
+    if (inv.error) {
+      console.error("[insertDeal] invitation failed:", inv.error.code, inv.error.message, inv.error.details);
+      throw inv.error;
+    }
+    console.log("[insertDeal] invitation saved", email);
   }
 }
 

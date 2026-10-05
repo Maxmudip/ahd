@@ -75,7 +75,7 @@ type AppStore = {
   /** Navigates back; on mobile the chat slides out to the right first. */
   goBack: (href: string) => void;
   updateDeal: (id: string, updater: (deal: Deal) => Deal, bump?: boolean) => void;
-  addDeal: (deal: Deal) => void;
+  addDeal: (deal: Deal) => Promise<void>;
   updatePool: (id: string, updater: (pool: PoolRequest) => PoolRequest, bump?: boolean) => void;
   addPool: (pool: PoolRequest) => void;
   markRead: (id: string) => void;
@@ -288,11 +288,24 @@ export function AppProvider({ user, children }: { user: SessionUser; children: R
   );
 
   const addDeal = useCallback(
-    (deal: Deal) => {
+    async (deal: Deal) => {
+      // Keep the row in the list even if the invitation write fails — load() on error used to wipe it.
       commitDeals([deal, ...dealsRef.current.filter((d) => d.id !== deal.id)]);
-      track(() => insertDeal(supabase, session, deal));
+      writes.current += 1;
+      writeVersion.current += 1;
+      try {
+        console.log("[addDeal] saving", { id: deal.id, status: deal.status, invite: deal.invitation?.email });
+        await insertDeal(supabase, session, deal);
+        setSyncError("");
+      } catch (error) {
+        console.error("[addDeal] failed", error);
+        setSyncError(explainError(error));
+        throw error;
+      } finally {
+        writes.current -= 1;
+      }
     },
-    [supabase, session, commitDeals, track],
+    [supabase, session, commitDeals],
   );
 
   const updatePool = useCallback(

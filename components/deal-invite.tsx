@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { useApp } from "@/components/app-store";
 import { Button } from "@/components/button";
 import { KindBadge } from "@/components/kind-badge";
 import type { Deal } from "@/lib/deals";
@@ -71,6 +72,7 @@ export function DealGate({
   onReject: () => Promise<void> | void;
   onResend: (email: string) => Promise<void>;
 }) {
+  const { syncError } = useApp();
   const [email, setEmail] = useState(deal.invitation?.email ?? "");
   const [sending, setSending] = useState(false);
   const [error, setError] = useState("");
@@ -158,6 +160,11 @@ export function DealGate({
       <div className="mt-4">
         <KindBadge kind={deal.kind ?? "kelishuv"} />
       </div>
+      {syncError ? (
+        <p role="alert" className="mt-5 max-w-sm rounded-[6px] bg-[#FDEBEC] px-3 py-2 text-left text-[13px] text-[#C4554D]">
+          {syncError}
+        </p>
+      ) : null}
     </div>
   );
 }

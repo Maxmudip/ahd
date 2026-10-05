@@ -58,5 +58,19 @@ export async function GET(request: Request) {
     }
   }
 
+  try {
+    const supabase = await createServerSupabase();
+    const probe = await supabase.from("deal_invitations").select("id").limit(1);
+    report.dealInvitationsTable = probe.error
+      ? { ok: false, code: probe.error.code, message: probe.error.message }
+      : { ok: true };
+    const rooms = await supabase.from("deal_rooms").select("id, status, initiator_role").limit(1);
+    report.dealRoomsInviteColumns = rooms.error
+      ? { ok: false, code: rooms.error.code, message: rooms.error.message }
+      : { ok: true, sampleHasInitiatorRole: rooms.data?.[0] ? "initiator_role" in (rooms.data[0] as object) : null };
+  } catch (error) {
+    report.dealInvitationsTable = { ok: false, message: error instanceof Error ? error.message : "probe failed" };
+  }
+
   return NextResponse.json(report);
 }

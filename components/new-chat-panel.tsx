@@ -7,6 +7,7 @@ import { Avatar } from "@/components/avatar";
 import { useApp } from "@/components/app-store";
 import { EmptyNote, IconButton } from "@/components/chat-ui";
 import { freshId, initialsOf } from "@/lib/chat-helpers";
+import { explainError } from "@/lib/data";
 import { nowTime, type Deal, type DealKind, type InitiatorRole } from "@/lib/deals";
 import { COUNTERPART_ROLE, ROLE_LABEL, isRoleForKind, rolesForKind } from "@/lib/roles";
 
@@ -34,6 +35,7 @@ export function NewChatPanel() {
   const [pickedId, setPickedId] = useState<string | null>(null);
   const [query, setQuery] = useState("");
   const [busy, setBusy] = useState(false);
+  const [formError, setFormError] = useState("");
   const [wasOpen, setWasOpen] = useState(false);
 
   if (open !== wasOpen) {
@@ -47,6 +49,7 @@ export function NewChatPanel() {
       setPickedId(null);
       setQuery(newChat.seed.includes("@") ? "" : newChat.seed);
       setBusy(false);
+      setFormError("");
     }
   }
 
@@ -89,9 +92,10 @@ export function NewChatPanel() {
     setStep("invite");
   }
 
-  function sendInvite() {
+  async function sendInvite() {
     if (!emailValid || !role || type === "pool" || busy) return;
     setBusy(true);
+    setFormError("");
     const id = freshId();
     const stamp = nowTime();
     const label = type === "qarz" ? "Qarz" : "Kelishuv";
@@ -125,9 +129,21 @@ export function NewChatPanel() {
         createdAt: new Date().toISOString(),
       },
     };
-    addDeal(deal);
-    closeNewChat();
-    router.push(`/dashboard/deals/${id}`);
+    console.log("[sendInvite]", { id, email, role, type, title: deal.title });
+    try {
+      await addDeal(deal);
+      closeNewChat();
+      router.push(`/dashboard/deals/${id}`);
+    } catch (error) {
+      const message = explainError(error);
+      console.error("[sendInvite] failed", error);
+      setFormError(message);
+      // The deal stays in the sidebar (pending). Open it so the waiting screen is visible.
+      closeNewChat();
+      router.push(`/dashboard/deals/${id}`);
+    } finally {
+      setBusy(false);
+    }
   }
 
   return (
@@ -324,14 +340,21 @@ export function NewChatPanel() {
           </button>
         ) : null}
         {step === "invite" ? (
-          <button
-            type="button"
-            onClick={sendInvite}
-            disabled={!emailValid || busy}
-            className="h-11 w-full rounded-full bg-[#111] text-[14px] font-semibold text-white hover:opacity-85 disabled:cursor-not-allowed disabled:opacity-40"
-          >
-            Taklif yuborish
-          </button>
+          <>
+            {formError ? (
+              <p role="alert" className="mb-2 rounded-[6px] bg-[#FDEBEC] px-3 py-2 text-[13px] text-[#C4554D]">
+                {formError}
+              </p>
+            ) : null}
+            <button
+              type="button"
+              onClick={() => void sendInvite()}
+              disabled={!emailValid || busy}
+              className="h-11 w-full rounded-full bg-[#111] text-[14px] font-semibold text-white hover:opacity-85 disabled:cursor-not-allowed disabled:opacity-40"
+            >
+              {busy ? "Yuborilmoqda…" : "Taklif yuborish"}
+            </button>
+          </>
         ) : null}
       </div>
     </div>
