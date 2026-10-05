@@ -48,6 +48,7 @@ export default function DealChatPage() {
   const [plusOpen, setPlusOpen] = useState(false);
   const [drawer, setDrawer] = useState<"doc" | "people" | null>(null);
   const [notice, setNotice] = useState("");
+  const [genError, setGenError] = useState("");
   const bottomRef = useRef<HTMLDivElement>(null);
   const fileRef = useRef<HTMLInputElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -88,11 +89,13 @@ export default function DealChatPage() {
     inputRef.current?.focus();
   }
 
-  async function generate() {
+  /** `fromPanel`: regenerate while the agreement panel stays open (it shows its own loading state). */
+  async function generate(fromPanel = false) {
     if (!deal || busy || !canGenerate) return;
     setBusy("generate");
     setPlusOpen(false);
-    setDrawer(null);
+    setGenError("");
+    if (!fromPanel) setDrawer(null);
 
     try {
       // Everything the parties wrote (no system notices or cards) goes to Claude.
@@ -142,10 +145,20 @@ export default function DealChatPage() {
       );
       setDrawer("doc");
     } catch (error) {
-      flash(error instanceof Error ? error.message : "Kelishuvni yaratib bo'lmadi.");
+      // The previous agreement stays untouched when generation fails.
+      const message = error instanceof Error ? error.message : "Kelishuvni yaratib bo'lmadi.";
+      setGenError(message);
+      flash(message);
     } finally {
       setBusy(null);
     }
+  }
+
+  function regenerate() {
+    if (!deal?.agreement || busy) return;
+    const signed = deal.agreement.parties.some((p) => p.signedAt);
+    if (signed && !window.confirm("Yangi kelishuv yaratilsa, qo'yilgan imzolar o'chiriladi. Davom etasizmi?")) return;
+    void generate(true);
   }
 
   function analyze() {
@@ -362,13 +375,43 @@ export default function DealChatPage() {
           <div className="p-4">
             <div className="mb-3 flex items-center justify-between gap-2">
               <StatusBadge status={deal.status} />
-              <Button variant="secondary" onClick={() => void downloadAgreementPdf(deal.agreement!)}>
+              <Button variant="secondary" onClick={() => void downloadAgreementPdf(deal.agreement!)} disabled={busy === "generate"}>
                 <Download size={14} className="mr-1.5" />
                 PDF yuklash
               </Button>
             </div>
-            <div data-theme="light" className="rounded-[10px] bg-white p-5 text-[#111] shadow-[0_1px_3px_rgba(0,0,0,0.12)]">
-              <AgreementPaper agreement={deal.agreement} status={deal.status} onSign={sign} />
+            {busy === "generate" ? (
+              <div role="status" aria-live="polite" className="rounded-[10px] bg-white p-5 shadow-[0_1px_3px_rgba(0,0,0,0.12)]">
+                <p className="text-[14px] font-medium text-[#8A6B2E]">🤖 Kelishuv qayta yaratilmoqda…</p>
+                <div className="mt-4 space-y-3">
+                  <div className="skeleton h-7 w-2/3" />
+                  <div className="skeleton h-4 w-full" />
+                  <div className="skeleton h-4 w-11/12" />
+                  <div className="skeleton h-4 w-4/5" />
+                  <div className="skeleton mt-6 h-5 w-1/3" />
+                  <div className="skeleton h-4 w-full" />
+                  <div className="skeleton h-4 w-3/4" />
+                </div>
+              </div>
+            ) : (
+              <div data-theme="light" className="rounded-[10px] bg-white p-5 text-[#111] shadow-[0_1px_3px_rgba(0,0,0,0.12)]">
+                <AgreementPaper agreement={deal.agreement} status={deal.status} onSign={sign} />
+              </div>
+            )}
+            {genError && busy !== "generate" ? (
+              <p role="alert" className="mt-3 rounded-[6px] bg-[#FDEBEC] px-3 py-2 text-[13px] text-[#C4554D]">
+                {genError}
+              </p>
+            ) : null}
+            <div className="mt-3 flex justify-end">
+              <Button
+                variant="outline"
+                onClick={regenerate}
+                disabled={busy !== null || !canGenerate}
+                className="!h-8 !px-3 text-[13px] !text-[#787774]"
+              >
+                🔄 Qayta yaratish
+              </Button>
             </div>
           </div>
         ) : (

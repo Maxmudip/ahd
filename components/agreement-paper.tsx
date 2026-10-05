@@ -64,10 +64,11 @@ export function AgreementPaper({
   );
 }
 
-/** Highlights the model's [TO BE CONFIRMED] markers so open points are easy to spot. */
+/** Highlights the model's "missing detail" markers so open points are easy to spot. */
+const MARKER = /(\[ANIQLANISHI KERAK\]|\[TO BE CONFIRMED\])/g;
 function Marked({ text }: { text: string }) {
-  return text.split(/(\[TO BE CONFIRMED\])/g).map((part, i) =>
-    part === "[TO BE CONFIRMED]" ? (
+  return text.split(MARKER).map((part, i) =>
+    i % 2 === 1 ? (
       <mark key={i} className="rounded-[3px] bg-[#F6EFD9] px-1 text-[#8A6B2E]">
         {part}
       </mark>

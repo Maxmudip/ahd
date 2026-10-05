@@ -26,7 +26,7 @@ export function parseAgreementText(text: string): { heading: string; preamble: s
     // "1. PREDMET" has a separate title; "1. The Seller shall..." is a full sentence and stays in the body.
     const isTitle = head.length <= MAX_TITLE && !/[.!?]$/.test(head);
     const body = (isTitle ? current.body : [current.head, ...current.body]).join("\n").trim();
-    clauses.push({ number: current.number, title: isTitle ? head : "", body: body || "[TO BE CONFIRMED]" });
+    clauses.push({ number: current.number, title: isTitle ? head : "", body: body || "[ANIQLANISHI KERAK]" });
     current = null;
   };
 
