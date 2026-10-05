@@ -1,6 +1,6 @@
 import Anthropic from "@anthropic-ai/sdk";
 import { NextResponse, type NextRequest } from "next/server";
-import { createAnthropic, readAnthropicKey } from "@/lib/anthropic";
+import { CLAUDE_MODEL, createAnthropic, readAnthropicKey } from "@/lib/anthropic";
 import { buildTranscript } from "@/lib/chat-transcript";
 import { createServerSupabase } from "@/lib/supabase-server";
 
@@ -8,8 +8,6 @@ import { createServerSupabase } from "@/lib/supabase-server";
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 export const maxDuration = 30;
-
-const MODEL = "claude-sonnet-4-5";
 
 const SYSTEM_PROMPT = `You are a contract mediation assistant for Uzbekistan. Analyze this business negotiation chat and identify the SINGLE most important missing term that should be discussed.
 
@@ -83,7 +81,7 @@ export async function POST(request: NextRequest) {
   try {
     const client = createAnthropic(apiKey);
     const response = await client.messages.create({
-      model: MODEL,
+      model: CLAUDE_MODEL,
       max_tokens: 200,
       system: SYSTEM_PROMPT,
       messages: [{ role: "user", content: userContent }],

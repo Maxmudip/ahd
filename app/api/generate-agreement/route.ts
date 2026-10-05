@@ -1,5 +1,5 @@
 import Anthropic from "@anthropic-ai/sdk";
-import { createAnthropic, describeKey, readAnthropicKey } from "@/lib/anthropic";
+import { CLAUDE_MODEL, createAnthropic, describeKey, readAnthropicKey } from "@/lib/anthropic";
 import { buildTranscript } from "@/lib/chat-transcript";
 import { NextResponse, type NextRequest } from "next/server";
 import { createServerSupabase } from "@/lib/supabase-server";
@@ -9,8 +9,6 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 // Generation can take a while; Vercel's default function limit is shorter.
 export const maxDuration = 60;
-
-const MODEL = "claude-sonnet-4-5";
 
 const SYSTEM_PROMPT = `You are a legal document assistant.
 Extract ONLY the key agreement terms from the chat.
@@ -104,7 +102,7 @@ export async function POST(request: NextRequest) {
   try {
     const client = createAnthropic(apiKey);
     const response = await client.messages.create({
-      model: MODEL,
+      model: CLAUDE_MODEL,
       max_tokens: 4096,
       system: SYSTEM_PROMPT,
       messages: [{ role: "user", content: userContent }],

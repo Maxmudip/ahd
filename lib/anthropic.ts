@@ -1,6 +1,12 @@
 import Anthropic from "@anthropic-ai/sdk";
 
 /**
+ * Pinned Claude Sonnet 4.5 snapshot used by every AI route. Change the model here only.
+ * (The dated snapshot is 20250929 — "claude-sonnet-4-5-20251001" does not exist; 20251001 is Haiku 4.5's date.)
+ */
+export const CLAUDE_MODEL = "claude-sonnet-4-5-20250929";
+
+/**
  * Server-only Anthropic client factory. The key comes from `process.env.ANTHROPIC_API_KEY`
  * (no NEXT_PUBLIC_ prefix, so it can never be bundled for the browser).
  *
