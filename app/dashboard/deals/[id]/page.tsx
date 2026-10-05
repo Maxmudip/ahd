@@ -84,18 +84,32 @@ export default function DealChatPage() {
   );
   const realCount = realMessages.length;
   const dealId = deal?.id ?? null;
-  const hasAgreement = Boolean(deal?.agreement);
+  const dealStatus = deal?.status;
 
-  // After every 3rd message (3, 6, 9 …) that arrives while this chat is open, ask the mediator what is missing.
+  // After every 3rd people-message (3, 6, 9 …) sent while this chat is open.
   useEffect(() => {
     if (!dealId) return;
     const prev = lastRealCount.current;
     lastRealCount.current = { id: dealId, count: realCount };
-    // First sight of this chat only sets the baseline, so opening a chat never triggers the AI.
-    if (!prev || prev.id !== dealId) return;
-    if (hasAgreement || mediatingRef.current || !isDealActive(deal?.status ?? "pending")) return;
-    if (Math.floor(realCount / 3) <= Math.floor(prev.count / 3)) return;
+    // Opening a chat only records the current count so a reload does not fire immediately.
+    if (!prev || prev.id !== dealId) {
+      console.log("[ai-mediator] baseline", { dealId, realCount, status: dealStatus });
+      return;
+    }
+    const crossed = Math.floor(realCount / 3) > Math.floor(prev.count / 3);
+    if (!crossed || mediatingRef.current || !isDealActive(dealStatus ?? "pending")) {
+      if (crossed) {
+        console.warn("[ai-mediator] skipped", {
+          realCount,
+          prev: prev.count,
+          mediating: mediatingRef.current,
+          status: dealStatus,
+        });
+      }
+      return;
+    }
 
+    console.log("[ai-mediator] calling /api/ai-mediator", { dealId, realCount });
     mediatingRef.current = true;
     const chat = realMessages.map((m) => ({ author: m.author, text: m.text, time: m.time }));
     const afterId = realMessages[realMessages.length - 1]?.id ?? null;
@@ -110,22 +124,25 @@ export default function DealChatPage() {
           body: JSON.stringify({ messages: chat, previousTips }),
         });
         const data = (await response.json().catch(() => null)) as { suggestion?: string | null; error?: string } | null;
+        console.log("[ai-mediator] response", response.status, data);
         if (!response.ok) throw new Error(data?.error ?? `HTTP ${response.status}`);
         const text = data?.suggestion?.trim();
-        // "complete" comes back as null: nothing important is missing, so no bubble.
         if (text) {
           shownTips.current[dealId] = [...previousTips, text];
           setTips((all) => [...all, { id: freshId(), dealId, afterId, text }]);
+        } else {
+          console.log("[ai-mediator] model said complete — no bubble");
         }
       } catch (error) {
-        // The mediator is a nice-to-have: never interrupt the conversation with an error.
-        console.warn("[ai-mediator]", error instanceof Error ? error.message : error);
+        const message = error instanceof Error ? error.message : "AI tavsiyasini olib bo'lmadi.";
+        console.error("[ai-mediator]", message, error);
+        flash(message);
       } finally {
         mediatingRef.current = false;
         setMediating(null);
       }
     })();
-  }, [dealId, realCount, realMessages, hasAgreement, deal?.status]);
+  }, [dealId, realCount, realMessages, dealStatus]);
 
   const canGenerate = useMemo(
     () => Boolean(deal?.messages.some((m) => m.side !== "system" && !m.kind)),

@@ -26,7 +26,8 @@ export function MediatorTip({
     <div className="flex w-full justify-start" data-ai-mediator-tip>
       <div
         role="note"
-        className="bubble-in origin-them mr-auto w-full max-w-[92%] rounded-[8px] border-l-[3px] border-l-[#C9A84C] bg-[#FFFBEB] px-3.5 py-3 text-[#3B2F0B] shadow-[0_1px_2px_rgba(0,0,0,0.08)] md:max-w-[520px]"
+        style={{ borderLeft: "3px solid #C9A84C" }}
+        className="bubble-in origin-them mr-auto w-full max-w-[92%] rounded-[8px] bg-[#FFFBEB] px-3.5 py-3 text-[#3B2F0B] shadow-[0_1px_2px_rgba(0,0,0,0.08)] md:max-w-[520px]"
       >
         <p className="text-[12px] font-semibold tracking-[0.01em] text-[#A8841F]">💡 Ahd AI tavsiyasi</p>
         <p className="mt-1.5 text-[14.5px] leading-[1.45] break-anywhere whitespace-pre-wrap">{tip.text}</p>
