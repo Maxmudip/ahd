@@ -95,7 +95,7 @@ const footer = {
 
 export default function HomePage() {
   return (
-    <div className="flex min-h-full flex-col overflow-x-hidden bg-white text-[#37352F]">
+    <div className="flex min-h-full flex-col overflow-x-clip bg-white text-[#37352F]">
       <LandingHeader />
 
       <main>

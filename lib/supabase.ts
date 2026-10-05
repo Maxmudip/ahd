@@ -15,7 +15,10 @@ export function createClient(): SupabaseClient {
   const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
   if (!url || !key) {
     throw new Error(
-      "Supabase is not configured: set NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY in .env.local and restart `npm run dev`.",
+      "Supabase sozlanmagan: NEXT_PUBLIC_SUPABASE_URL va NEXT_PUBLIC_SUPABASE_ANON_KEY topilmadi. " +
+        "Lokal: .env.local faylida belgilang va `npm run dev` ni qayta ishga tushiring. " +
+        "Vercel: Project Settings → Environment Variables ga qo'shing va qayta deploy qiling " +
+        "(NEXT_PUBLIC_* qiymatlari faqat build vaqtida kiritiladi).",
     );
   }
 

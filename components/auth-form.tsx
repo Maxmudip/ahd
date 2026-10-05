@@ -6,6 +6,7 @@ import { useState, type FormEvent } from "react";
 import { Check } from "lucide-react";
 import { Button } from "@/components/button";
 import { Logo } from "@/components/logo";
+import { authMessage } from "@/lib/auth-errors";
 import { createClient } from "@/lib/supabase";
 
 type AuthFormProps = {
@@ -13,22 +14,6 @@ type AuthFormProps = {
   /** Message shown above the form, e.g. after a failed email confirmation link. */
   initialError?: string;
 };
-
-/** Supabase auth errors -> Uzbek copy. */
-function authMessage(error: { message: string; code?: string }) {
-  const text = error.message.toLowerCase();
-  if (text.includes("invalid login credentials")) return "Email yoki parol noto'g'ri.";
-  if (text.includes("email not confirmed")) return "Email manzilingiz hali tasdiqlanmagan. Pochtangizdagi havolani bosing.";
-  if (text.includes("already registered") || text.includes("already been registered")) {
-    return "Bu email bilan hisob mavjud. Kirish sahifasiga o'ting.";
-  }
-  if (text.includes("password") && text.includes("least")) return "Parol kamida 6 belgidan iborat bo'lsin.";
-  if (text.includes("rate limit") || error.code === "over_email_send_rate_limit") {
-    return "Juda ko'p urinish. Birozdan so'ng qayta urinib ko'ring.";
-  }
-  if (text.includes("fetch") || text.includes("network")) return "Internetga ulanib bo'lmadi. Qayta urinib ko'ring.";
-  return error.message;
-}
 
 const points = [
   "Chatdan rasmiy kelishuv",
@@ -95,7 +80,8 @@ export function AuthForm({ mode, initialError = "" }: AuthFormProps) {
       }
       setInfo(`${email} manziliga tasdiqlash xati yuborildi. Havolani bosing, so'ng kiring.`);
     } catch (e) {
-      setError(authMessage({ message: e instanceof Error ? e.message : "Kutilmagan xatolik" }));
+      console.error("[auth] unexpected error:", e);
+      setError(authMessage({ message: e instanceof Error ? e.message : "Kutilmagan xatolik", name: e instanceof Error ? e.name : undefined }));
     } finally {
       setBusy(false);
     }
@@ -156,7 +142,7 @@ export function AuthForm({ mode, initialError = "" }: AuthFormProps) {
               />
             </label>
             {error ? (
-              <p role="alert" className="rounded-[6px] bg-[#FDEBEC] px-3 py-2 text-[14px] text-[#C4554D]">
+              <p role="alert" className="rounded-[6px] bg-[#FDEBEC] px-3 py-2 text-[14px] whitespace-pre-line break-words text-[#C4554D]">
                 {error}
               </p>
             ) : null}

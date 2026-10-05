@@ -95,6 +95,21 @@
   border-color: var(--border);
 }
 
+/* The document itself must always scroll. Never put overflow: hidden on html/body — on iOS Safari
+   it turns body into its own scroller and breaks touch scrolling. Horizontal overflow is clipped on
+   page wrappers with `overflow-x: clip` instead (clip does not create a scroll container). */
+html {
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  -webkit-text-size-adjust: 100%;
+}
+
+body {
+  overflow-x: clip;
+  overflow-y: visible;
+  -webkit-overflow-scrolling: touch;
+}
+
 html,
 body {
   background: #ffffff;
@@ -361,8 +376,6 @@ textarea.field {
   html,
   body {
     max-width: 100%;
-    overflow-x: hidden;
-    overscroll-behavior: none;
   }
 
   /* 16px inputs stop iOS Safari from zooming (and shifting the page sideways) on focus. */

@@ -10,7 +10,21 @@ import { NextResponse, type NextRequest } from "next/server";
 export async function proxy(request: NextRequest) {
   let response = NextResponse.next({ request });
 
-  const supabase = createServerClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!, {
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+  // Missing env vars (e.g. not set on Vercel) must not turn /login into a 500: let the page render so
+  // the form can show a readable error. Protected routes stay closed.
+  if (!url || !key) {
+    if (request.nextUrl.pathname.startsWith("/dashboard")) {
+      const to = request.nextUrl.clone();
+      to.pathname = "/login";
+      to.search = "?error=config";
+      return NextResponse.redirect(to);
+    }
+    return response;
+  }
+
+  const supabase = createServerClient(url, key, {
     cookies: {
       getAll() {
         return request.cookies.getAll();
@@ -24,8 +38,14 @@ export async function proxy(request: NextRequest) {
   });
 
   // getClaims() verifies the JWT; do not run code between createServerClient and this call.
-  const { data } = await supabase.auth.getClaims();
-  const signedIn = Boolean(data?.claims);
+  let signedIn = false;
+  try {
+    const { data } = await supabase.auth.getClaims();
+    signedIn = Boolean(data?.claims);
+  } catch (error) {
+    // Supabase unreachable / bad key: treat as signed out instead of crashing the request.
+    console.error("[proxy] auth check failed:", error instanceof Error ? error.message : error);
+  }
   const { pathname, search } = request.nextUrl;
 
   const redirect = (to: string, query?: string) => {
