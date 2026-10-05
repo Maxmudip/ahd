@@ -35,13 +35,13 @@ export function AgreementCard({
           <FileText size={18} className="text-[#C9A84C]" />
           <p className="text-[15px] font-semibold">Kelishuv tayyorlandi</p>
         </div>
-        <p className="mt-1.5 text-[13.5px] font-medium">{agreement.subject}</p>
+        <p className="mt-1.5 line-clamp-2 text-[13.5px] font-medium">{agreement.subject}</p>
         <p className="text-[12px] text-ink2">{agreement.id}</p>
         {first ? (
           <div className="mt-2 rounded-[8px] bg-wash px-2.5 py-2">
             <p className="line-clamp-3 text-[13px] leading-5 text-ink2">
               <span className="font-semibold text-ink">
-                {first.number}. {first.title}.
+                {first.number}.{first.title ? ` ${first.title}.` : ""}
               </span>{" "}
               {first.body}
             </p>

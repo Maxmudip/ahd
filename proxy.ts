@@ -1,5 +1,6 @@
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
+import { serverSupabaseEnv } from "@/lib/supabase-env";
 
 /**
  * Runs before /dashboard, /login and /register:
@@ -10,11 +11,10 @@ import { NextResponse, type NextRequest } from "next/server";
 export async function proxy(request: NextRequest) {
   let response = NextResponse.next({ request });
 
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+  const env = serverSupabaseEnv();
   // Missing env vars (e.g. not set on Vercel) must not turn /login into a 500: let the page render so
   // the form can show a readable error. Protected routes stay closed.
-  if (!url || !key) {
+  if (!env) {
     if (request.nextUrl.pathname.startsWith("/dashboard")) {
       const to = request.nextUrl.clone();
       to.pathname = "/login";
@@ -24,7 +24,7 @@ export async function proxy(request: NextRequest) {
     return response;
   }
 
-  const supabase = createServerClient(url, key, {
+  const supabase = createServerClient(env.url, env.key, {
     cookies: {
       getAll() {
         return request.cookies.getAll();

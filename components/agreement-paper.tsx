@@ -32,15 +32,19 @@ export function AgreementPaper({
         </div>
       </div>
 
-      <h2 className="mt-8 text-[30px] font-semibold tracking-[-0.02em] text-[#111]">Kelishuv shartnomasi</h2>
-      <p className="mt-2 text-[16px] leading-7 text-[#787774]">{agreement.subject}</p>
+      <h2 className="mt-8 text-[30px] font-semibold tracking-[-0.02em] text-[#111]">{agreement.title}</h2>
+      <p className="mt-2 text-[16px] leading-7 whitespace-pre-line text-[#787774]">
+        <Marked text={agreement.subject} />
+      </p>
 
       {agreement.clauses.map((clause) => (
         <section key={clause.number} className="mt-8">
           <h3 className="text-[24px] font-semibold tracking-[-0.02em] text-[#111]">
-            {clause.number}. {clause.title}
+            {clause.number}.{clause.title ? ` ${clause.title}` : ""}
           </h3>
-          <p className="mt-2 text-[16px] leading-[1.7] text-[#37352F]">{clause.body}</p>
+          <p className="mt-2 text-[16px] leading-[1.7] whitespace-pre-line text-[#37352F]">
+            <Marked text={clause.body} />
+          </p>
         </section>
       ))}
 
@@ -57,6 +61,19 @@ export function AgreementPaper({
         Ahd · tuzilgan: {agreement.generatedAt} · {agreement.id}
       </p>
     </article>
+  );
+}
+
+/** Highlights the model's [TO BE CONFIRMED] markers so open points are easy to spot. */
+function Marked({ text }: { text: string }) {
+  return text.split(/(\[TO BE CONFIRMED\])/g).map((part, i) =>
+    part === "[TO BE CONFIRMED]" ? (
+      <mark key={i} className="rounded-[3px] bg-[#F6EFD9] px-1 text-[#8A6B2E]">
+        {part}
+      </mark>
+    ) : (
+      part
+    ),
   );
 }
 

@@ -74,9 +74,10 @@ export async function downloadAgreementPdf(agreement: AgreementDocument) {
   y += rowH + 10;
 
   agreement.clauses
-    .filter((c) => c.number !== "1")
+    // The built-in template's "Tomonlar" clause is replaced by the parties block above; AI clauses are kept.
+    .filter((c) => !(c.number === "1" && c.title === "Tomonlar" && c.body.startsWith("Ushbu shartnoma")))
     .forEach((clause) => {
-      const heading = `${clause.number}. ${clause.title}`;
+      const heading = clause.title ? `${clause.number}. ${clause.title}` : `${clause.number}.`;
       const body = pdf.splitTextToSize(clause.body, width);
       const blockH = 6 + body.length * 5 + 4;
       if (y + blockH > pageH - margin - 52) {

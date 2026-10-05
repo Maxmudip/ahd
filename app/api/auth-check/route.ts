@@ -1,4 +1,5 @@
 import { NextResponse, type NextRequest } from "next/server";
+import { serverSupabaseEnv } from "@/lib/supabase-env";
 
 export const dynamic = "force-dynamic";
 
@@ -8,27 +9,29 @@ export const dynamic = "force-dynamic";
  * Returns only booleans and Supabase's own public settings — never keys.
  */
 export async function GET(request: NextRequest) {
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+  const rawUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const rawKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+  const env = serverSupabaseEnv();
   const origin = request.nextUrl.origin;
 
   const report: Record<string, unknown> = {
-    envUrlSet: Boolean(url),
-    envKeySet: Boolean(key),
-    supabaseHost: url ? new URL(url).host : null,
+    envUrlSet: Boolean(rawUrl),
+    envKeySet: Boolean(rawKey),
+    envValid: Boolean(env),
+    supabaseHost: env ? new URL(env.url).host : null,
     siteOrigin: origin,
     addToSupabaseRedirectUrls: [`${origin}/auth/callback`, `${origin}/**`],
   };
 
-  if (!url || !key) {
+  if (!env) {
     report.ok = false;
     report.problem =
-      "NEXT_PUBLIC_SUPABASE_URL / NEXT_PUBLIC_SUPABASE_ANON_KEY yo'q. Vercel → Settings → Environment Variables ga qo'shing va qayta deploy qiling.";
+      "NEXT_PUBLIC_SUPABASE_URL / NEXT_PUBLIC_SUPABASE_ANON_KEY yo'q yoki noto'g'ri (URL https:// bilan boshlanishi, qo'shtirnoq/bo'sh joy bo'lmasligi kerak). Vercel → Settings → Environment Variables ga qo'shing va qayta deploy qiling.";
     return NextResponse.json(report, { status: 500 });
   }
 
   try {
-    const res = await fetch(`${url}/auth/v1/settings`, { headers: { apikey: key }, cache: "no-store" });
+    const res = await fetch(`${env.url}/auth/v1/settings`, { headers: { apikey: env.key }, cache: "no-store" });
     report.authReachable = res.ok;
     report.authStatus = res.status;
     if (res.ok) {

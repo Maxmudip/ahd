@@ -36,6 +36,9 @@ export function initialAuthError(error?: string | string[], reason?: string | st
   if (code === "config") {
     return "Server sozlanmagan: Supabase environment variables topilmadi. /api/auth-check sahifasini oching.";
   }
+  if (code === "server") {
+    return "Supabase'ga ulanib bo'lmadi yoki javob bermadi. /api/auth-check sahifasini oching va Vercel loglarini tekshiring.";
+  }
   if (code === "confirm") {
     const base = "Tasdiqlash havolasi eskirgan yoki noto'g'ri. Qayta kiring.";
     return why ? `${base}\n[${why}]` : base;

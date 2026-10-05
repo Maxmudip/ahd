@@ -25,10 +25,10 @@ import {
 import { KindBadge } from "@/components/kind-badge";
 import { StatusBadge } from "@/components/status-badge";
 import { formatFileSize, freshId, initialsOf, nameColor } from "@/lib/chat-helpers";
+import { buildAgreementFromAiText } from "@/lib/agreement-text";
 import { downloadAgreementPdf } from "@/lib/export-agreement-pdf";
 import {
   STATUS_LABEL,
-  buildAgreementFromDeal,
   formatUzDate,
   nowTime,
   type ChatMessage,
@@ -88,29 +88,44 @@ export default function DealChatPage() {
     inputRef.current?.focus();
   }
 
-  function generate() {
+  async function generate() {
     if (!deal || busy || !canGenerate) return;
     setBusy("generate");
     setPlusOpen(false);
-    window.setTimeout(() => {
+    setDrawer(null);
+
+    try {
+      // Everything the parties wrote (no system notices or cards) goes to Claude.
+      const chat = deal.messages
+        .filter((m) => m.side !== "system" && !m.kind && m.text.trim())
+        .map((m) => ({ author: m.author, text: m.text, time: m.time }));
+      const response = await fetch("/api/generate-agreement", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          messages: chat,
+          title: deal.title,
+          parties: deal.parties.map((p) => ({ name: p.name, role: p.role })),
+        }),
+      });
+      const data = (await response.json().catch(() => null)) as { agreement?: string; error?: string } | null;
+      if (!response.ok || !data?.agreement) {
+        throw new Error(data?.error ?? `Server xatosi (${response.status}).`);
+      }
+      const text = data.agreement;
+
       const sysId = freshId();
       const agreementId = freshId();
       const signatureId = freshId();
       const time = nowTime();
+      // updateDeal also writes the agreement (clauses) and the new messages to Supabase.
       updateDeal(
         id,
         (d) => {
-          const agreement = buildAgreementFromDeal(d);
+          const agreement = buildAgreementFromAiText(d, text);
           const base = d.messages.filter((m) => m.kind !== "agreement" && m.kind !== "signature");
           const added: ChatMessage[] = [
-            {
-              id: sysId,
-              author: "Tizim",
-              side: "system",
-              text: "AI kelishuv qoralamasi tayyor.",
-              time,
-              day: "Bugun",
-            },
+            { id: sysId, author: "Tizim", side: "system", text: "AI kelishuv qoralamasi tayyor.", time, day: "Bugun" },
             { id: agreementId, author: "Ahd AI", side: "them", kind: "agreement", text: "", time, day: "Bugun" },
             { id: signatureId, author: "Ahd AI", side: "them", kind: "signature", text: "", time, day: "Bugun" },
           ];
@@ -125,8 +140,12 @@ export default function DealChatPage() {
         },
         true,
       );
+      setDrawer("doc");
+    } catch (error) {
+      flash(error instanceof Error ? error.message : "Kelishuvni yaratib bo'lmadi.");
+    } finally {
       setBusy(null);
-    }, 700);
+    }
   }
 
   function analyze() {
@@ -238,14 +257,14 @@ export default function DealChatPage() {
   const kind = deal.kind ?? "kelishuv";
 
   const plusItems: PillItem[] = [
-    { label: "📄 Kelishuv yaratish", onClick: generate, disabled: !canGenerate || busy !== null },
+    { label: "📄 Kelishuv yaratish", onClick: () => void generate(), disabled: !canGenerate || busy !== null },
     { label: "💰 Qarz so'rash", onClick: () => router.push("/dashboard/pool-qarz/create") },
     { label: "🤖 AI tahlil", onClick: analyze, disabled: busy !== null },
     { label: "📎 Fayl yuborish", onClick: () => fileRef.current?.click() },
   ];
   const quick: PillItem[] | undefined =
     !deal.agreement && canGenerate && !busy
-      ? [{ label: "📄 Kelishuv yaratish", onClick: generate }]
+      ? [{ label: "📄 Kelishuv yaratish", onClick: () => void generate() }]
       : undefined;
 
   const items = deal.messages.map((message, index, all) => {
@@ -295,7 +314,7 @@ export default function DealChatPage() {
                   label: "AI kelishuv yaratish",
                   icon: <Sparkles size={16} />,
                   disabled: !canGenerate || busy !== null,
-                  onClick: generate,
+                  onClick: () => void generate(),
                 },
                 {
                   label: isArchived ? "Arxivdan chiqarish" : "Arxivlash",
@@ -367,7 +386,7 @@ export default function DealChatPage() {
               disabled={!canGenerate || busy !== null}
               onClick={() => {
                 setDrawer(null);
-                generate();
+                void generate();
               }}
             >
               AI kelishuv yaratish
