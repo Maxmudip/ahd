@@ -1,4 +1,5 @@
 import Anthropic from "@anthropic-ai/sdk";
+import { createAnthropic, describeKey, readAnthropicKey } from "@/lib/anthropic";
 import { NextResponse, type NextRequest } from "next/server";
 import { createServerSupabase } from "@/lib/supabase-server";
 
@@ -24,7 +25,9 @@ function fail(error: string, status: number) {
 }
 
 export async function POST(request: NextRequest) {
-  const apiKey = process.env.ANTHROPIC_API_KEY?.trim();
+  const apiKey = readAnthropicKey();
+  // Masked diagnostics only (prefix + length) — the full key must never be written to logs.
+  console.log("[generate-agreement] ANTHROPIC_API_KEY received:", describeKey(process.env.ANTHROPIC_API_KEY));
   if (!apiKey) {
     console.error("[generate-agreement] ANTHROPIC_API_KEY is not set");
     return fail("AI xizmati sozlanmagan: serverda ANTHROPIC_API_KEY topilmadi.", 503);
@@ -82,7 +85,7 @@ export async function POST(request: NextRequest) {
     .join("\n\n");
 
   try {
-    const client = new Anthropic({ apiKey });
+    const client = createAnthropic(apiKey);
     const response = await client.messages.create({
       model: MODEL,
       max_tokens: 4096,
@@ -98,8 +101,13 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ agreement });
   } catch (error) {
     if (error instanceof Anthropic.APIError) {
-      console.error("[generate-agreement] Anthropic error:", error.status, error.message);
-      if (error.status === 401) return fail("ANTHROPIC_API_KEY noto'g'ri yoki bekor qilingan.", 502);
+      console.error("[generate-agreement] Anthropic error:", error.status, error.message, "baseURL:", process.env.ANTHROPIC_BASE_URL ?? "default");
+      if (error.status === 401) {
+        return fail(
+          "Anthropic kalitni rad etdi (401). Kalit noto'g'ri/bekor qilingan yoki serverda boshqa qiymat ishlatilmoqda — /api/debug-env?verify=1 ni oching.",
+          502,
+        );
+      }
       if (error.status === 429) return fail("AI limitiga yetildi. Birozdan so'ng qayta urinib ko'ring.", 429);
       if (error.status === 529 || (error.status ?? 0) >= 500) return fail("AI xizmati vaqtincha ishlamayapti. Qayta urinib ko'ring.", 502);
       return fail(`AI xatosi (${error.status ?? "?"}): ${error.message}`, 502);
