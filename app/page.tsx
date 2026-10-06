@@ -1,7 +1,8 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import Link from "next/link";
+import { SmoothScroll } from "@/components/smooth-scroll";
 
 const NAV = [
   { href: "#muammo", label: "Muammo" },
@@ -13,12 +14,8 @@ const NAV = [
 export default function HomePage() {
   const [menu, setMenu] = useState(false);
 
-  useEffect(() => {
-    document.documentElement.classList.add("scroll-smooth");
-    return () => document.documentElement.classList.remove("scroll-smooth");
-  }, []);
-
   return (
+    <SmoothScroll>
     <div className="landing min-h-full bg-[#f5f5f5] text-[#111]">
       <style>{`
         .landing { --border: #e5e5e5; --accent: #111111; }
@@ -432,5 +429,6 @@ export default function HomePage() {
         </div>
       </footer>
     </div>
+    </SmoothScroll>
   );
 }

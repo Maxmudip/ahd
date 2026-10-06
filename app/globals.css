@@ -110,6 +110,18 @@ body {
   -webkit-overflow-scrolling: touch;
 }
 
+/* Lenis (landing page). Classes are added on html while SmoothScroll is mounted. */
+html.lenis,
+html.lenis body {
+  height: auto;
+}
+.lenis.lenis-smooth {
+  scroll-behavior: auto !important;
+}
+.lenis.lenis-stopped {
+  overflow: hidden;
+}
+
 html,
 body {
   background: #ffffff;
