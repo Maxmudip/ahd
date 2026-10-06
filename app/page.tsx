@@ -84,18 +84,15 @@ export default function HomePage() {
         ) : null}
       </header>
 
-      <section className="mx-auto grid max-w-6xl items-center gap-12 px-5 py-16 lg:grid-cols-2 lg:py-24">
-        <div>
-          <span className="inline-flex rounded-full border border-[#ddd] bg-white px-3 py-1 text-[12px] text-[#666]">
-            O&apos;zbekiston uchun AI kelishuv platformasi
-          </span>
-          <h1 className="mt-5 text-4xl leading-[1.15] font-bold tracking-tight text-[#111] sm:text-5xl lg:text-[52px]">
+      <section className="mx-auto max-w-6xl px-5 py-16 lg:py-24">
+        <div className="mx-auto max-w-3xl text-center">
+          <h1 className="text-4xl leading-[1.15] font-bold tracking-tight text-[#111] sm:text-5xl lg:text-[52px]">
             Do&apos;stingizdan qarz oldingizmi? Ishchi yolladingizmi? Ahd bilan kelishuvni rasmiylashtiring.
           </h1>
-          <p className="mt-5 max-w-lg text-[17px] leading-7 text-[#666]">
+          <p className="mx-auto mt-5 max-w-lg text-[17px] leading-7 text-[#666]">
             Chat orqali gaplashing — AI shartnoma tuzib beradi. 2 daqiqada, bepul.
           </p>
-          <div className="mt-8 flex flex-wrap gap-3">
+          <div className="mt-8 flex flex-wrap justify-center gap-3">
             <Link
               href="/register"
               className="inline-flex h-12 items-center rounded-full bg-[#111] px-6 text-[15px] font-semibold text-white hover:bg-black"
@@ -109,10 +106,6 @@ export default function HomePage() {
               Qanday ishlaydi
             </a>
           </div>
-          <p className="mt-5 text-[13px] text-[#999]">Kredit kartasi shart emas · 2 daqiqada tayyor</p>
-        </div>
-        <div className="flex justify-center lg:justify-end">
-          <PhoneMock />
         </div>
       </section>
 
@@ -475,32 +468,6 @@ export default function HomePage() {
           <p className="mt-12 text-[13px] text-[#999]">© 2024 Ahd. Barcha huquqlar himoyalangan.</p>
         </div>
       </footer>
-    </div>
-  );
-}
-
-function PhoneMock() {
-  return (
-    <div className="w-[min(100%,280px)] rounded-[2.5rem] border-[8px] border-[#222] bg-white shadow-xl">
-      <div className="mx-auto mt-3 h-5 w-20 rounded-full bg-[#111]" />
-      <div className="p-3 pb-5">
-        <p className="mb-3 text-center text-[11px] font-semibold text-[#888]">Jasur · Ijrochi</p>
-        <div className="space-y-2">
-          <p className="max-w-[88%] rounded-2xl rounded-tl-sm bg-[#f0f0f0] px-3 py-2 text-[12px] leading-4 text-[#222]">
-            Logo va landing 5 kunda, 3 000 000 so&apos;m.
-          </p>
-          <p className="ml-auto max-w-[88%] rounded-2xl rounded-tr-sm bg-[#111] px-3 py-2 text-[12px] leading-4 text-white">
-            Avans 40%, qolgani topshirishda.
-          </p>
-          <p className="max-w-[88%] rounded-2xl rounded-tl-sm bg-[#f0f0f0] px-3 py-2 text-[12px] leading-4 text-[#222]">
-            Kelishdik. Hujjatni tuzamizmi?
-          </p>
-          <div className="rounded-2xl border border-[#eee] bg-[#fafafa] px-3 py-2.5">
-            <p className="text-[12px] font-semibold text-[#111]">Kelishuv tayyor ✓</p>
-            <p className="mt-1 text-[11px] text-[#888]">AI qoralama · imzo kutilmoqda</p>
-          </div>
-        </div>
-      </div>
     </div>
   );
 }
