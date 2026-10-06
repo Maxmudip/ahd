@@ -19,19 +19,17 @@ import {
   addContact,
   deleteDealRoom,
   insertDeal,
-  insertPool,
   insertRating,
   mapMessage,
   personFromSession,
   resendInvitation,
   respondToInvitation,
   saveDealChange,
-  savePoolChange,
   type MessageRow,
   type SessionUser,
 } from "@/lib/data";
 import type { Deal, RatingReview } from "@/lib/deals";
-import type { Person, PoolRequest } from "@/lib/pool-qarz";
+import type { Person } from "@/lib/people";
 import { createClient } from "@/lib/supabase";
 import { stampLabel } from "@/lib/time-labels";
 
@@ -39,16 +37,12 @@ export type Theme = "light" | "dark";
 
 type NewChatState = { open: boolean; seed: string };
 
-export type ListTab = "deals" | "pools" | "archive";
+export type ListTab = "deals" | "archive";
 
 /** Which list tab a route implies; routes that say nothing keep the current tab. */
 export function tabForPath(pathname: string, archived: string[], current: ListTab): ListTab {
-  const chat = pathname.match(/^\/dashboard\/(deals|pool-qarz)\/([^/]+)$/);
-  if (chat && chat[1] === "deals") return archived.includes(chat[2]) ? "archive" : "deals";
-  if (chat && chat[2] !== "create" && chat[2] !== "contributions") {
-    return archived.includes(chat[2]) ? "archive" : "pools";
-  }
-  if (pathname.startsWith("/dashboard/pool-qarz")) return current === "archive" ? current : "pools";
+  const chat = pathname.match(/^\/dashboard\/deals\/([^/]+)$/);
+  if (chat) return archived.includes(chat[1]) ? "archive" : "deals";
   return current;
 }
 
@@ -57,7 +51,7 @@ type AppStore = {
   me: Person;
   /** Sign-in email of the user. */
   email: string;
-  /** Other registered users: people you can start a chat or a pool with. */
+  /** Other registered users: people you can start a chat with. */
   contacts: Person[];
   refreshContacts: () => Promise<void>;
   searchUserByEmail: (email: string) => Promise<Person | null>;
@@ -67,7 +61,6 @@ type AppStore = {
   dismissSyncError: () => void;
   signOut: () => Promise<void>;
   deals: Deal[];
-  pools: PoolRequest[];
   unread: Record<string, number>;
   archived: string[];
   theme: Theme;
@@ -82,8 +75,6 @@ type AppStore = {
   goBack: (href: string) => void;
   updateDeal: (id: string, updater: (deal: Deal) => Deal, bump?: boolean) => void;
   addDeal: (deal: Deal) => Promise<void>;
-  updatePool: (id: string, updater: (pool: PoolRequest) => PoolRequest, bump?: boolean) => void;
-  addPool: (pool: PoolRequest) => void;
   markRead: (id: string) => void;
   toggleArchive: (id: string) => void;
   deleteDeal: (id: string) => Promise<void>;
@@ -125,7 +116,6 @@ export function AppProvider({ user, children }: { user: SessionUser; children: R
   const me = useMemo(() => ({ ...personFromSession(session), ...meStats }), [session, meStats]);
 
   const [deals, setDeals] = useState<Deal[]>([]);
-  const [pools, setPools] = useState<PoolRequest[]>([]);
   const [contacts, setContacts] = useState<Person[]>([]);
   const [unread, setUnread] = useState<Record<string, number>>({});
   const [archived, setArchived] = useState<string[]>([]);
@@ -141,7 +131,6 @@ export function AppProvider({ user, children }: { user: SessionUser; children: R
 
   // Latest committed lists, so event handlers (and realtime callbacks) never act on stale state.
   const dealsRef = useRef<Deal[]>([]);
-  const poolsRef = useRef<PoolRequest[]>([]);
   const pathRef = useRef(pathname);
   useEffect(() => {
     pathRef.current = pathname;
@@ -150,10 +139,6 @@ export function AppProvider({ user, children }: { user: SessionUser; children: R
   const commitDeals = useCallback((next: Deal[]) => {
     dealsRef.current = next;
     setDeals(next);
-  }, []);
-  const commitPools = useCallback((next: PoolRequest[]) => {
-    poolsRef.current = next;
-    setPools(next);
   }, []);
 
   /* ---- loading from Supabase ---- */
@@ -174,7 +159,6 @@ export function AppProvider({ user, children }: { user: SessionUser; children: R
         const dealIds = new Set(data.deals.map((d) => d.id));
         const merged = data.deals.map((d) => (local.includes(d.id) ? { ...d, archived: true } : d));
         commitDeals(merged);
-        commitPools(data.pools);
         setContacts(data.contacts);
         setReviews(data.reviews);
         setMeStats(data.meStats);
@@ -196,7 +180,7 @@ export function AppProvider({ user, children }: { user: SessionUser; children: R
     } finally {
       setHydrated(true);
     }
-  }, [supabase, session, commitDeals, commitPools]);
+  }, [supabase, session, commitDeals]);
 
   /** Serializes database writes (a deal must exist before its messages) and heals the UI on failure. */
   const track = useCallback(
@@ -271,14 +255,6 @@ export function AppProvider({ user, children }: { user: SessionUser; children: R
       .on("postgres_changes", { event: "*", schema: "public", table: "agreements" }, scheduleRefresh)
       .on("postgres_changes", { event: "*", schema: "public", table: "deal_invitations" }, scheduleRefresh)
       .on("postgres_changes", { event: "*", schema: "public", table: "ratings" }, scheduleRefresh)
-      .on("postgres_changes", { event: "*", schema: "public", table: "pool_qarz_requests" }, scheduleRefresh)
-      .on("postgres_changes", { event: "INSERT", schema: "public", table: "pool_qarz_contributions" }, (payload) => {
-        const row = payload.new as { request_id: string; contributor_id: string };
-        if (row.contributor_id !== session.id && pathRef.current !== `/dashboard/pool-qarz/${row.request_id}`) {
-          bumpUnread(row.request_id);
-        }
-        scheduleRefresh();
-      })
       .subscribe();
 
     const onVisible = () => {
@@ -326,28 +302,6 @@ export function AppProvider({ user, children }: { user: SessionUser; children: R
       }
     },
     [supabase, session, commitDeals],
-  );
-
-  const updatePool = useCallback(
-    (id: string, updater: (pool: PoolRequest) => PoolRequest, bump = false) => {
-      const current = poolsRef.current;
-      const index = current.findIndex((p) => p.id === id);
-      if (index < 0) return;
-      const prev = current[index];
-      const next = updater(prev);
-      if (next === prev) return;
-      commitPools(bump ? [next, ...current.filter((_, i) => i !== index)] : current.map((p, i) => (i === index ? next : p)));
-      track(() => savePoolChange(supabase, session, prev, next));
-    },
-    [supabase, session, commitPools, track],
-  );
-
-  const addPool = useCallback(
-    (pool: PoolRequest) => {
-      commitPools([pool, ...poolsRef.current.filter((p) => p.id !== pool.id)]);
-      track(() => insertPool(supabase, session, pool));
-    },
-    [supabase, session, commitPools, track],
   );
 
   const markRead = useCallback((id: string) => {
@@ -506,7 +460,6 @@ export function AppProvider({ user, children }: { user: SessionUser; children: R
       dismissSyncError,
       signOut,
       deals,
-      pools,
       unread,
       archived: archivedIds,
       theme,
@@ -518,8 +471,6 @@ export function AppProvider({ user, children }: { user: SessionUser; children: R
       goBack,
       updateDeal,
       addDeal,
-      updatePool,
-      addPool,
       markRead,
       toggleArchive,
       deleteDeal,
@@ -543,7 +494,6 @@ export function AppProvider({ user, children }: { user: SessionUser; children: R
       dismissSyncError,
       signOut,
       deals,
-      pools,
       unread,
       archivedIds,
       theme,
@@ -554,8 +504,6 @@ export function AppProvider({ user, children }: { user: SessionUser; children: R
       goBack,
       updateDeal,
       addDeal,
-      updatePool,
-      addPool,
       markRead,
       toggleArchive,
       deleteDeal,

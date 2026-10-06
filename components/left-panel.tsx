@@ -3,8 +3,8 @@
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
-import { CheckCheck, FileText, Paperclip, PenLine, Search, Settings, SquarePen, UserPlus, Users, Wallet } from "lucide-react";
-import { Avatar, GroupAvatar } from "@/components/avatar";
+import { CheckCheck, FileText, Paperclip, PenLine, Search, Settings, SquarePen, UserPlus, Users } from "lucide-react";
+import { Avatar } from "@/components/avatar";
 import { useApp, type ListTab } from "@/components/app-store";
 import { EmptyNote, IconButton } from "@/components/chat-ui";
 import { InviteActions } from "@/components/deal-invite";
@@ -16,12 +16,11 @@ import { Logo } from "@/components/logo";
 import { NewChatPanel } from "@/components/new-chat-panel";
 import { initialsOf, listTime } from "@/lib/chat-helpers";
 import type { Deal } from "@/lib/deals";
-import type { PoolRequest } from "@/lib/pool-qarz";
 
 type Row = {
   id: string;
-  kind: "deal" | "pool" | "invite";
-  /** Chat type shown as a chip: Kelishuv, Qarz or Pool Qarz. */
+  kind: "deal" | "invite";
+  /** Chat type shown as a chip: Kelishuv or Qarz. */
   chatKind: ChatKind;
   href: string;
   avatar: ReactNode;
@@ -45,7 +44,6 @@ type NavItem =
 const NAV: NavItem[] = [
   { type: "tab", id: "deals", label: "Kelishuvlar" },
   { type: "link", id: "contacts", label: "Kontaktlar", href: "/dashboard/contacts" },
-  { type: "tab", id: "pools", label: "Pool Qarz" },
   { type: "tab", id: "archive", label: "Arxiv" },
 ];
 
@@ -110,23 +108,10 @@ function dealPreview(deal: Deal): ReactNode {
   return <Preview>{last.text}</Preview>;
 }
 
-function poolPreview(pool: PoolRequest): ReactNode {
-  if (pool.status === "completed") {
-    return (
-      <Preview icon={<CheckCheck size={16} className="text-[#2E9E5B]" />}>
-        <span className="text-[#2E9E5B]">Yakunlangan</span>
-      </Preview>
-    );
-  }
-  const last = pool.activity[0];
-  const mark = last?.text.includes("qo'shdi") ? " ✓" : "";
-  return <Preview icon={<Wallet size={14} />}>{`${last?.text ?? "So'rov yaratildi"}${mark}`}</Preview>;
-}
-
 export function LeftPanel() {
   const pathname = usePathname();
   const router = useRouter();
-  const { me, deals, contacts, pools, unread, archived, openNewChat, listTab: tab, setListTab: setTab, incomingInvites, respondToInvite, toggleArchive, deleteDeal } = useApp();
+  const { me, deals, contacts, unread, archived, openNewChat, listTab: tab, setListTab: setTab, incomingInvites, respondToInvite, toggleArchive, deleteDeal } = useApp();
   const onContacts = pathname.startsWith("/dashboard/contacts");
   const [query, setQuery] = useState("");
   const [swipeId, setSwipeId] = useState<string | null>(null);
@@ -197,25 +182,9 @@ export function LeftPanel() {
       hay: `${deal.title} ${deal.counterparty}`.toLowerCase(),
       inviteDeal: deal,
     }));
-    const poolRows: Row[] = pools.map((pool) => {
-      const second = pool.contributors[0]?.person ?? pool.invited[0] ?? pool.borrower;
-      return {
-        id: pool.id,
-        kind: "pool",
-        chatKind: "pool",
-        href: `/dashboard/pool-qarz/${pool.id}`,
-        avatar: <GroupAvatar initials={[pool.borrower.initials, second.initials]} />,
-        name: pool.isMine ? `Mening so'rovim — ${pool.purpose}` : `${pool.borrower.name} — ${pool.purpose}`,
-        time: pool.activity[0]?.time ?? "",
-        preview: poolPreview(pool),
-        unread: unread[pool.id] ?? 0,
-        hay: `${pool.borrower.name} ${pool.purpose}`.toLowerCase(),
-      };
-    });
-    if (tab === "deals") return [...inviteRows, ...dealRows].filter((r) => !archived.includes(r.id));
-    if (tab === "pools") return poolRows.filter((r) => !archived.includes(r.id));
-    return [...dealRows, ...poolRows].filter((r) => archived.includes(r.id));
-  }, [deals, pools, unread, archived, tab, incomingInvites, contacts, me.id]);
+    if (tab === "archive") return dealRows.filter((r) => archived.includes(r.id));
+    return [...inviteRows, ...dealRows].filter((r) => !archived.includes(r.id));
+  }, [deals, unread, archived, tab, incomingInvites, contacts, me.id]);
 
   const q = query.trim().toLowerCase();
   const visible = q ? rows.filter((r) => r.hay.includes(q)) : rows;
@@ -264,9 +233,7 @@ export function LeftPanel() {
               aria-selected={!onContacts && tab === item.id}
               onClick={() => {
                 setTab(item.id);
-                if (onContacts) {
-                  router.push(item.id === "pools" ? "/dashboard/pool-qarz" : "/dashboard");
-                }
+                if (onContacts) router.push("/dashboard");
               }}
               className={tabClass(!onContacts && tab === item.id)}
             >
@@ -282,23 +249,6 @@ export function LeftPanel() {
       </div>
 
       <div className="min-h-0 flex-1 overflow-y-auto">
-        {tab === "pools" && !q ? (
-          <Link
-            href="/dashboard/pool-qarz/contributions"
-            className={`flex h-14 items-center gap-3 px-3 ${
-              pathname === "/dashboard/pool-qarz/contributions" ? "bg-sel" : "hover:bg-hov"
-            }`}
-          >
-            <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-[#F6EFD9] text-[20px]">
-              💸
-            </span>
-            <span className="min-w-0">
-              <span className="block text-[15px] font-semibold text-ink">Qo&apos;shganlarim</span>
-              <span className="block truncate text-[13px] text-ink2">Qarz bergan so&apos;rovlaringiz</span>
-            </span>
-          </Link>
-        ) : null}
-
         {visible.map((row) =>
           row.kind === "invite" && row.inviteDeal ? (
             <div

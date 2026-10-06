@@ -7,7 +7,7 @@ import { useApp } from "@/components/app-store";
 import { Sheet } from "@/components/sheet";
 import { explainError } from "@/lib/data";
 import { initialsOf } from "@/lib/chat-helpers";
-import type { Person } from "@/lib/pool-qarz";
+import type { Person } from "@/lib/people";
 
 const EMAIL_OK = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 

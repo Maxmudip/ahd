@@ -11,11 +11,8 @@
 --   deal_participants         people (or external parties) in a deal room + their signature
 --   messages                  chat messages of a deal room (text, ai, file, agreement, signature, system)
 --   agreements                the AI-generated agreement document of a deal room
---   pool_qarz_requests        a "Pool Qarz" request (a group collects money for one borrower)
---   pool_qarz_contributions   money added to a request by a friend
 --
--- Security: row level security is ON for every table. A user only sees deal rooms they take part
--- in, and pool requests they created, were invited to, or contributed to.
+-- Security: row level security is ON for every table. A user only sees deal rooms they take part in.
 -- =====================================================================================
 
 -- -------------------------------------------------------------------------------------
@@ -131,44 +128,6 @@ create table if not exists public.agreements (
 );
 
 -- -------------------------------------------------------------------------------------
--- pool_qarz_requests
--- Only the last 4 digits of the guarantee card are stored — never the full card number.
--- -------------------------------------------------------------------------------------
-create table if not exists public.pool_qarz_requests (
-  id              uuid primary key default gen_random_uuid(),
-  borrower_id     uuid not null default auth.uid() references public.users (id) on delete cascade,
-  amount          numeric(16, 2) not null check (amount > 0),
-  currency        text not null default 'UZS' check (currency in ('UZS', 'USD')),
-  purpose         text not null,
-  description     text not null default '',
-  status          text not null default 'collecting' check (status in ('collecting', 'full', 'completed')),
-  min_contribute  numeric(16, 2) not null default 0,
-  repay_date      date not null,
-  schedule        text not null default 'once' check (schedule in ('once', 'monthly')),
-  repayments      jsonb not null default '[]'::jsonb,
-  card_last4      text not null default '',
-  invited_ids     uuid[] not null default '{}',
-  collect_until   timestamptz not null default (now() + interval '30 days'),
-  created_at      timestamptz not null default now(),
-  updated_at      timestamptz not null default now()
-);
-create index if not exists pool_requests_borrower_idx on public.pool_qarz_requests (borrower_id);
-create index if not exists pool_requests_invited_idx on public.pool_qarz_requests using gin (invited_ids);
-
--- -------------------------------------------------------------------------------------
--- pool_qarz_contributions
--- -------------------------------------------------------------------------------------
-create table if not exists public.pool_qarz_contributions (
-  id              uuid primary key default gen_random_uuid(),
-  request_id      uuid not null references public.pool_qarz_requests (id) on delete cascade,
-  contributor_id  uuid not null default auth.uid() references public.users (id) on delete cascade,
-  amount          numeric(16, 2) not null check (amount > 0),
-  created_at      timestamptz not null default now()
-);
-create index if not exists pool_contributions_request_idx on public.pool_qarz_contributions (request_id, created_at);
-create index if not exists pool_contributions_contributor_idx on public.pool_qarz_contributions (contributor_id);
-
--- -------------------------------------------------------------------------------------
 -- Helper functions (SECURITY DEFINER so policies do not recurse into each other)
 -- -------------------------------------------------------------------------------------
 create or replace function public.is_deal_member(p_deal uuid)
@@ -180,23 +139,6 @@ set search_path = public
 as $$
   select exists (select 1 from public.deal_rooms r where r.id = p_deal and r.created_by = auth.uid())
       or exists (select 1 from public.deal_participants p where p.deal_id = p_deal and p.user_id = auth.uid());
-$$;
-
-create or replace function public.can_view_pool(p_pool uuid)
-returns boolean
-language sql
-stable
-security definer
-set search_path = public
-as $$
-  select exists (
-           select 1 from public.pool_qarz_requests r
-           where r.id = p_pool and (r.borrower_id = auth.uid() or auth.uid() = any (r.invited_ids))
-         )
-      or exists (
-           select 1 from public.pool_qarz_contributions c
-           where c.request_id = p_pool and c.contributor_id = auth.uid()
-         );
 $$;
 
 -- -------------------------------------------------------------------------------------
@@ -214,10 +156,6 @@ $$;
 
 drop trigger if exists deal_rooms_touch on public.deal_rooms;
 create trigger deal_rooms_touch before update on public.deal_rooms
-  for each row execute function public.touch_updated_at();
-
-drop trigger if exists pool_requests_touch on public.pool_qarz_requests;
-create trigger pool_requests_touch before update on public.pool_qarz_requests
   for each row execute function public.touch_updated_at();
 
 -- A new message moves its deal room to the top of everybody's list.
@@ -259,63 +197,6 @@ drop trigger if exists deal_participants_guard on public.deal_participants;
 create trigger deal_participants_guard before update on public.deal_participants
   for each row execute function public.guard_signature();
 
--- Contributions: only to an open request, never to your own, never above the remaining amount.
-create or replace function public.validate_contribution()
-returns trigger
-language plpgsql
-security definer
-set search_path = public
-as $$
-declare
-  r     public.pool_qarz_requests;
-  total numeric;
-begin
-  select * into r from public.pool_qarz_requests where id = new.request_id for update;
-  if not found then
-    raise exception 'So''rov topilmadi';
-  end if;
-  if r.borrower_id = new.contributor_id then
-    raise exception 'O''z so''rovingizga qo''sha olmaysiz';
-  end if;
-  if r.status <> 'collecting' then
-    raise exception 'Yig''ish yopilgan';
-  end if;
-  select coalesce(sum(amount), 0) into total from public.pool_qarz_contributions where request_id = new.request_id;
-  if total + new.amount > r.amount then
-    raise exception 'Qolgan summadan oshib ketdi';
-  end if;
-  return new;
-end;
-$$;
-
-drop trigger if exists pool_contributions_validate on public.pool_qarz_contributions;
-create trigger pool_contributions_validate before insert on public.pool_qarz_contributions
-  for each row execute function public.validate_contribution();
-
--- Once the goal is reached the request becomes "full".
-create or replace function public.after_contribution()
-returns trigger
-language plpgsql
-security definer
-set search_path = public
-as $$
-begin
-  update public.pool_qarz_requests r
-     set status = case
-                    when (select coalesce(sum(c.amount), 0) from public.pool_qarz_contributions c where c.request_id = r.id) >= r.amount
-                      then 'full'
-                    else r.status
-                  end,
-         updated_at = now()
-   where r.id = new.request_id;
-  return new;
-end;
-$$;
-
-drop trigger if exists pool_contributions_after on public.pool_qarz_contributions;
-create trigger pool_contributions_after after insert on public.pool_qarz_contributions
-  for each row execute function public.after_contribution();
-
 -- -------------------------------------------------------------------------------------
 -- Row level security
 -- -------------------------------------------------------------------------------------
@@ -324,8 +205,6 @@ alter table public.deal_rooms               enable row level security;
 alter table public.deal_participants        enable row level security;
 alter table public.messages                 enable row level security;
 alter table public.agreements               enable row level security;
-alter table public.pool_qarz_requests       enable row level security;
-alter table public.pool_qarz_contributions  enable row level security;
 
 -- users: every signed-in user can see profiles (contacts list); you can only change your own.
 drop policy if exists "users_select" on public.users;
@@ -386,51 +265,26 @@ drop policy if exists "agreements_update" on public.agreements;
 create policy "agreements_update" on public.agreements for update to authenticated
   using (public.is_deal_member(deal_id)) with check (public.is_deal_member(deal_id));
 
--- pool_qarz_requests
-drop policy if exists "pool_requests_select" on public.pool_qarz_requests;
-create policy "pool_requests_select" on public.pool_qarz_requests for select to authenticated
-  using (borrower_id = auth.uid() or auth.uid() = any (invited_ids) or public.can_view_pool(id));
-drop policy if exists "pool_requests_insert" on public.pool_qarz_requests;
-create policy "pool_requests_insert" on public.pool_qarz_requests for insert to authenticated
-  with check (borrower_id = auth.uid());
-drop policy if exists "pool_requests_update" on public.pool_qarz_requests;
-create policy "pool_requests_update" on public.pool_qarz_requests for update to authenticated
-  using (borrower_id = auth.uid()) with check (borrower_id = auth.uid());
-drop policy if exists "pool_requests_delete" on public.pool_qarz_requests;
-create policy "pool_requests_delete" on public.pool_qarz_requests for delete to authenticated
-  using (borrower_id = auth.uid());
-
--- pool_qarz_contributions
-drop policy if exists "pool_contributions_select" on public.pool_qarz_contributions;
-create policy "pool_contributions_select" on public.pool_qarz_contributions for select to authenticated
-  using (public.can_view_pool(request_id));
-drop policy if exists "pool_contributions_insert" on public.pool_qarz_contributions;
-create policy "pool_contributions_insert" on public.pool_qarz_contributions for insert to authenticated
-  with check (contributor_id = auth.uid() and public.can_view_pool(request_id));
-
 -- -------------------------------------------------------------------------------------
 -- Privileges: signed-in users only (anonymous visitors get nothing).
 -- -------------------------------------------------------------------------------------
 grant usage on schema public to anon, authenticated;
 grant select, insert, update, delete on
-  public.users, public.deal_rooms, public.deal_participants, public.messages, public.agreements,
-  public.pool_qarz_requests, public.pool_qarz_contributions
+  public.users, public.deal_rooms, public.deal_participants, public.messages, public.agreements
 to authenticated;
 revoke all on
-  public.users, public.deal_rooms, public.deal_participants, public.messages, public.agreements,
-  public.pool_qarz_requests, public.pool_qarz_contributions
+  public.users, public.deal_rooms, public.deal_participants, public.messages, public.agreements
 from anon;
 
 -- -------------------------------------------------------------------------------------
--- Realtime: live chat and live pool progress for every participant.
+-- Realtime: live chat for every participant.
 -- -------------------------------------------------------------------------------------
 do $$
 declare
   t text;
 begin
   foreach t in array array[
-    'messages', 'deal_rooms', 'deal_participants', 'agreements',
-    'pool_qarz_requests', 'pool_qarz_contributions'
+    'messages', 'deal_rooms', 'deal_participants', 'agreements'
   ]
   loop
     begin

@@ -25,7 +25,7 @@ export function ChatShell({ children }: { children: ReactNode }) {
   const sidebarWidth = useSidebarWidth();
   const asideRef = useRef<HTMLElement>(null);
 
-  const isList = pathname === "/dashboard" || pathname === "/dashboard/pool-qarz";
+  const isList = pathname === "/dashboard";
   const showTabs =
     isList || pathname.startsWith("/dashboard/settings") || pathname.startsWith("/dashboard/contacts");
   const chatOpen = !isList && !closing;

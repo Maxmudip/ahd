@@ -40,28 +40,3 @@ export function Avatar({
     </span>
   );
 }
-
-/** Two overlapping circles, like a WhatsApp group avatar. */
-export function GroupAvatar({ initials, size = 48 }: { initials: string[]; size?: 40 | 48 }) {
-  const circle = size === 48 ? 32 : 27;
-  const [a, b] = [initials[0] ?? "?", initials[1] ?? initials[0] ?? "?"];
-  const [bgA, fgA] = tint(a);
-  const [bgB, fgB] = tint(b);
-  const text = size === 48 ? "text-[11px]" : "text-[10px]";
-  return (
-    <span className="relative inline-block shrink-0" style={{ width: size, height: size }}>
-      <span
-        style={{ background: bgA, color: fgA, width: circle, height: circle }}
-        className={`absolute top-0 left-0 inline-flex items-center justify-center rounded-full font-semibold ${text}`}
-      >
-        {a}
-      </span>
-      <span
-        style={{ background: bgB, color: fgB, width: circle, height: circle }}
-        className={`absolute right-0 bottom-0 inline-flex items-center justify-center rounded-full font-semibold ring-2 ring-[var(--c-panel)] ${text}`}
-      >
-        {b}
-      </span>
-    </span>
-  );
-}

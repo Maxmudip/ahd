@@ -12,13 +12,12 @@ import { explainError } from "@/lib/data";
 import { nowTime, type Deal, type DealKind, type InitiatorRole } from "@/lib/deals";
 import { COUNTERPART_ROLE, ROLE_LABEL, isRoleForKind, rolesForKind } from "@/lib/roles";
 
-type ChatType = DealKind | "pool";
+type ChatType = DealKind;
 type Step = "type" | "role" | "invite";
 
 const TYPES: { id: ChatType; emoji: string; title: string; sub: string }[] = [
   { id: "kelishuv", emoji: "🤝", title: "Kelishuv", sub: "Shartnoma tuzish" },
   { id: "qarz", emoji: "💵", title: "Qarz", sub: "Ikki tomonlama" },
-  { id: "pool", emoji: "👥", title: "Pool Qarz", sub: "Do'stlar bilan" },
 ];
 
 const EMAIL_OK = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -55,8 +54,8 @@ export function NewChatPanel() {
     }
   }
 
-  const dealKind: DealKind = type === "qarz" ? "qarz" : "kelishuv";
-  const roles = type === "pool" ? [] : rolesForKind(dealKind);
+  const dealKind: DealKind = type;
+  const roles = rolesForKind(dealKind);
   const theirRole = role ? COUNTERPART_ROLE[role] : null;
 
   const q = query.trim().toLowerCase();
@@ -81,11 +80,6 @@ export function NewChatPanel() {
   }
 
   function goNextFromType() {
-    if (type === "pool") {
-      closeNewChat();
-      router.push("/dashboard/pool-qarz/create");
-      return;
-    }
     setStep("role");
   }
 
@@ -95,7 +89,7 @@ export function NewChatPanel() {
   }
 
   async function sendInvite() {
-    if (!emailValid || !role || type === "pool" || busy) return;
+    if (!emailValid || !role || busy) return;
     setBusy(true);
     setFormError("");
     const id = freshId();
@@ -174,7 +168,7 @@ export function NewChatPanel() {
 
       <div className="min-h-0 flex-1 overflow-y-auto">
         {step === "type" ? (
-          <div className="grid grid-cols-3 gap-2 px-3 pt-3">
+          <div className="grid grid-cols-2 gap-2 px-3 pt-3">
             {TYPES.map((item) => {
               const active = type === item.id;
               return (
@@ -195,17 +189,6 @@ export function NewChatPanel() {
                 </button>
               );
             })}
-          </div>
-        ) : null}
-
-        {step === "type" && type === "pool" ? (
-          <div className="px-5 py-8 text-center">
-            <p className="text-[32px]" aria-hidden>
-              👥
-            </p>
-            <p className="mt-2 text-[14px] text-ink2">
-              Do&apos;stlaringizni keyingi qadamda tanlaysiz: summa, maqsad va kafolat bilan guruh ochiladi.
-            </p>
           </div>
         ) : null}
 

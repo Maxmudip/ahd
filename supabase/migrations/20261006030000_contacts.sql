@@ -8,7 +8,7 @@
 -- Stops the global user-directory leak:
 --   users_select used to be `using (true)` so every signed-in user could list every profile.
 -- Contacts are now an owned list (user_id = auth.uid()). Profiles are visible only for
--- yourself and people in that list. Rows are filled when you share a deal or a pool.
+-- yourself and people in that list. Rows are filled when you share a deal.
 -- =====================================================================================
 
 -- -------------------------------------------------------------------------------------
@@ -105,30 +105,8 @@ create trigger contacts_after_deal_participant
   after insert or update of user_id on public.deal_participants
   for each row execute function public.sync_contacts_from_deal_participant();
 
-create or replace function public.sync_contacts_from_pool_contribution()
-returns trigger
-language plpgsql
-security definer
-set search_path = public
-as $$
-declare
-  borrower uuid;
-begin
-  select r.borrower_id into borrower
-    from public.pool_qarz_requests r
-   where r.id = new.request_id;
-  perform public.add_contact_pair(new.contributor_id, borrower);
-  return new;
-end;
-$$;
-
-drop trigger if exists contacts_after_pool_contribution on public.pool_qarz_contributions;
-create trigger contacts_after_pool_contribution
-  after insert on public.pool_qarz_contributions
-  for each row execute function public.sync_contacts_from_pool_contribution();
-
 -- -------------------------------------------------------------------------------------
--- Backfill from deals and pools that already exist
+-- Backfill from deals that already exist
 -- -------------------------------------------------------------------------------------
 insert into public.contacts (user_id, contact_user_id)
 select distinct a.user_id, b.user_id
@@ -137,32 +115,4 @@ select distinct a.user_id, b.user_id
  where a.user_id is not null
    and b.user_id is not null
    and a.user_id <> b.user_id
-on conflict (user_id, contact_user_id) do nothing;
-
-insert into public.contacts (user_id, contact_user_id)
-select distinct r.borrower_id, c.contributor_id
-  from public.pool_qarz_contributions c
-  join public.pool_qarz_requests r on r.id = c.request_id
- where r.borrower_id <> c.contributor_id
-on conflict (user_id, contact_user_id) do nothing;
-
-insert into public.contacts (user_id, contact_user_id)
-select distinct c.contributor_id, r.borrower_id
-  from public.pool_qarz_contributions c
-  join public.pool_qarz_requests r on r.id = c.request_id
- where r.borrower_id <> c.contributor_id
-on conflict (user_id, contact_user_id) do nothing;
-
-insert into public.contacts (user_id, contact_user_id)
-select distinct r.borrower_id, invited.id
-  from public.pool_qarz_requests r
-  cross join lateral unnest(r.invited_ids) as invited(id)
- where invited.id is not null and invited.id <> r.borrower_id
-on conflict (user_id, contact_user_id) do nothing;
-
-insert into public.contacts (user_id, contact_user_id)
-select distinct invited.id, r.borrower_id
-  from public.pool_qarz_requests r
-  cross join lateral unnest(r.invited_ids) as invited(id)
- where invited.id is not null and invited.id <> r.borrower_id
 on conflict (user_id, contact_user_id) do nothing;

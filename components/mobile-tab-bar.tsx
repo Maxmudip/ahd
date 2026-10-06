@@ -3,32 +3,26 @@
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import type { ReactNode } from "react";
-import { MessageCircle, User, Users, UsersRound } from "lucide-react";
+import { MessageCircle, User, UsersRound } from "lucide-react";
 import { useApp, type ListTab } from "@/components/app-store";
 
 type Item = {
-  id: "deals" | "contacts" | "pools" | "profile";
+  id: "deals" | "contacts" | "profile";
   label: string;
   href: string;
   icon: ReactNode;
   badge: number;
 };
 
-/** Bottom tab bar, mobile only: Kelishuvlar | Kontaktlar | Pool Qarz | Profil. */
+/** Bottom tab bar, mobile only: Kelishuvlar | Kontaktlar | Profil. */
 export function MobileTabBar() {
   const pathname = usePathname();
   const router = useRouter();
-  const { deals, pools, unread, archived, listTab, setListTab, goBack } = useApp();
+  const { deals, unread, archived, setListTab, goBack } = useApp();
 
   const onProfile = pathname.startsWith("/dashboard/settings");
   const onContacts = pathname.startsWith("/dashboard/contacts");
-  const active: Item["id"] = onProfile
-    ? "profile"
-    : onContacts
-      ? "contacts"
-      : listTab === "pools"
-        ? "pools"
-        : "deals";
+  const active: Item["id"] = onProfile ? "profile" : onContacts ? "contacts" : "deals";
 
   const count = (ids: string[]) => ids.reduce((sum, id) => sum + (archived.includes(id) ? 0 : (unread[id] ?? 0)), 0);
 
@@ -47,20 +41,13 @@ export function MobileTabBar() {
       icon: <UsersRound size={24} />,
       badge: 0,
     },
-    {
-      id: "pools",
-      label: "Pool Qarz",
-      href: "/dashboard/pool-qarz",
-      icon: <Users size={24} />,
-      badge: count(pools.map((p) => p.id)),
-    },
     { id: "profile", label: "Profil", href: "/dashboard/settings", icon: <User size={24} />, badge: 0 },
   ];
 
   function open(event: React.MouseEvent, item: Item) {
-    if (item.id === "profile" || item.id === "contacts") return; // plain link: the screen slides in
+    if (item.id === "profile" || item.id === "contacts") return;
     event.preventDefault();
-    const tab: ListTab = item.id === "pools" ? "pools" : "deals";
+    const tab: ListTab = "deals";
     setListTab(tab);
     if (onProfile || onContacts) goBack(item.href);
     else if (pathname !== item.href) router.push(item.href);
@@ -69,7 +56,7 @@ export function MobileTabBar() {
   return (
     <nav
       aria-label="Asosiy"
-      className="z-20 grid shrink-0 grid-cols-4 border-t border-line bg-panel md:hidden"
+      className="z-20 grid shrink-0 grid-cols-3 border-t border-line bg-panel md:hidden"
       style={{ height: "calc(60px + env(safe-area-inset-bottom))", paddingBottom: "env(safe-area-inset-bottom)" }}
     >
       {items.map((item) => {

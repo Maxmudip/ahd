@@ -1,5 +1,5 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { firstName, initialsOf } from "@/lib/chat-helpers";
+import { initialsOf } from "@/lib/chat-helpers";
 import {
   formatUzDate,
   formatUzDateTime,
@@ -18,18 +18,8 @@ import {
   type Party,
   type RatingReview,
 } from "@/lib/deals";
-import {
-  formatMoney,
-  type Activity,
-  type Contributor,
-  type Currency,
-  type Person,
-  type PoolRequest,
-  type PoolStatus,
-  type RepaymentRow,
-  type Schedule,
-} from "@/lib/pool-qarz";
-import { clock, dayLabel, daysUntil, relativeLabel, stampLabel } from "@/lib/time-labels";
+import type { Person } from "@/lib/people";
+import { clock, dayLabel, stampLabel } from "@/lib/time-labels";
 
 /* -------------------------------------------------------------------------------------------
  * Database rows (see supabase/migrations/*.sql)
@@ -107,37 +97,11 @@ type AgreementRow = {
   issued_at: string;
   generated_at: string;
 };
-type PoolRow = {
-  id: string;
-  borrower_id: string;
-  amount: number | string;
-  currency: Currency;
-  purpose: string;
-  description: string;
-  status: PoolStatus;
-  min_contribute: number | string;
-  repay_date: string;
-  schedule: Schedule;
-  repayments: RepaymentRow[];
-  card_last4: string;
-  invited_ids: string[];
-  collect_until: string;
-  created_at: string;
-  updated_at: string;
-};
-type ContributionRow = {
-  id: string;
-  request_id: string;
-  contributor_id: string;
-  amount: number | string;
-  created_at: string;
-};
 
 export type SessionUser = { id: string; name: string; email: string; phone: string };
 
 export type AppData = {
   deals: Deal[];
-  pools: PoolRequest[];
   contacts: Person[];
   reviews: RatingReview[];
   meStats: { avgRating: number | null; totalDeals: number; totalRatings: number };
@@ -217,8 +181,6 @@ export function personFromSession(user: SessionUser): Person {
     initials: initialsOf(user.name),
   };
 }
-
-const num = (value: number | string) => Number(value) || 0;
 
 /** "2026-12-15" (a date column) -> local Date. */
 function parseDateOnly(value: string) {
@@ -327,62 +289,6 @@ function buildDeal(
   };
 }
 
-function buildPool(
-  row: PoolRow,
-  contributions: ContributionRow[],
-  person: (id: string) => Person,
-  meId: string,
-  now: Date,
-): PoolRequest {
-  const amount = num(row.amount);
-  const sorted = [...contributions].sort((a, b) => b.created_at.localeCompare(a.created_at));
-  const contributors: Contributor[] = sorted.map((c) => {
-    const at = new Date(c.created_at);
-    return { id: c.id, person: person(c.contributor_id), amount: num(c.amount), date: formatUzDate(at), relative: relativeLabel(at, now) };
-  });
-  const collected = contributors.reduce((sum, c) => sum + c.amount, 0);
-  const repayDay = parseDateOnly(row.repay_date);
-  const repayEnd = new Date(repayDay.getFullYear(), repayDay.getMonth(), repayDay.getDate() + 1);
-
-  const activity: Activity[] = contributors.map((c) => ({
-    id: c.id as string,
-    text: `${firstName(c.person.name)} ${formatMoney(c.amount, row.currency)} qo'shdi`,
-    time: c.relative,
-    mine: c.person.id === meId,
-  }));
-  if (collected >= amount && contributors[0]) {
-    activity.unshift({ id: `full-${row.id}`, text: "Maqsad yig'ildi! 🎉", time: contributors[0].relative });
-  }
-  if (row.status === "completed") {
-    activity.unshift({ id: `done-${row.id}`, text: "Qarz to'liq qaytarildi", time: relativeLabel(new Date(row.updated_at), now) });
-  }
-  activity.push({ id: `created-${row.id}`, text: "So'rov yaratildi", time: relativeLabel(new Date(row.created_at), now) });
-
-  return {
-    id: row.id,
-    borrower: person(row.borrower_id),
-    isMine: row.borrower_id === meId,
-    amount,
-    collected,
-    currency: row.currency,
-    purpose: row.purpose,
-    description: row.description,
-    daysLeft: row.status === "collecting" ? daysUntil(new Date(row.collect_until), now) : 0,
-    repayOverdue: row.status !== "completed" && repayEnd.getTime() < now.getTime(),
-    status: row.status,
-    contributors,
-    invited: (row.invited_ids ?? []).map(person),
-    repayDate: formatUzDate(repayDay),
-    repayIso: toDateOnly(repayDay),
-    schedule: row.schedule,
-    repayments: row.repayments ?? [],
-    activity,
-    minContribute: num(row.min_contribute),
-    createdAt: formatUzDate(new Date(row.created_at)),
-    cardLast4: row.card_last4,
-  };
-}
-
 /* -------------------------------------------------------------------------------------------
  * Reading
  * ----------------------------------------------------------------------------------------- */
@@ -432,7 +338,7 @@ async function fetchOwnedContactUsers(sb: SupabaseClient, meId: string): Promise
 
 /** Everything the signed-in user can see (Row Level Security does the filtering). */
 export async function fetchAppData(sb: SupabaseClient, me: SessionUser): Promise<AppData> {
-  const [mine, contactUsers, rooms, participants, messages, agreements, pools, contributions, invitations, ratings] = await Promise.all([
+  const [mine, contactUsers, rooms, participants, messages, agreements, invitations, ratings] = await Promise.all([
     sb.from("users").select("*").eq("id", me.id).then((r) => must<UserRow[]>(r)),
     fetchOwnedContactUsers(sb, me.id),
     sb.from("deal_rooms").select("*").order("updated_at", { ascending: false }).then((r) => must<DealRoomRow[]>(r)),
@@ -441,10 +347,6 @@ export async function fetchAppData(sb: SupabaseClient, me: SessionUser): Promise
       sb.from("messages").select("*").order("created_at", { ascending: true }).order("id").range(from, to),
     ),
     sb.from("agreements").select("*").then((r) => must<AgreementRow[]>(r)),
-    sb.from("pool_qarz_requests").select("*").order("updated_at", { ascending: false }).then((r) => must<PoolRow[]>(r)),
-    fetchAllRows<ContributionRow>((from, to) =>
-      sb.from("pool_qarz_contributions").select("*").order("created_at", { ascending: true }).order("id").range(from, to),
-    ),
     sb.from("deal_invitations").select("*").order("created_at", { ascending: false }).then((r) => {
       // Missing table / RLS must not wipe the deal list — that was making new pending chats vanish.
       if (r.error) {
@@ -470,7 +372,6 @@ export async function fetchAppData(sb: SupabaseClient, me: SessionUser): Promise
   const partsByDeal = groupBy(participants, (p) => p.deal_id);
   const msgsByDeal = groupBy(messages, (m) => m.deal_id);
   const agreementByDeal = new Map(agreements.map((a) => [a.deal_id, a]));
-  const contribByPool = groupBy(contributions, (c) => c.request_id);
   const inviteByDeal = new Map<string, InvitationRow>();
   for (const inv of invitations) {
     const prev = inviteByDeal.get(inv.deal_room_id);
@@ -495,7 +396,6 @@ export async function fetchAppData(sb: SupabaseClient, me: SessionUser): Promise
         ratedDeals.has(room.id),
       ),
     ),
-    pools: pools.map((row) => buildPool(row, contribByPool.get(row.id) ?? [], person, me.id, now)),
     contacts: contactUsers
       .filter((u) => u.id !== me.id)
       .map(personFromUser)
@@ -523,7 +423,7 @@ export async function fetchAppData(sb: SupabaseClient, me: SessionUser): Promise
   };
 }
 
-/** Just the contact list (people you can start a chat or a pool with). */
+/** Just the contact list (people you can start a chat with). */
 export async function fetchContacts(sb: SupabaseClient, me: SessionUser): Promise<Person[]> {
   const users = await fetchOwnedContactUsers(sb, me.id);
   return users.filter((u) => u.id !== me.id).map(personFromUser).sort((a, b) => a.name.localeCompare(b.name));
@@ -774,30 +674,6 @@ export async function saveDealChange(sb: SupabaseClient, me: SessionUser, prev: 
   }
 }
 
-/* -------------------------------------------------------------------------------------------
- * Writing — Pool Qarz
- * ----------------------------------------------------------------------------------------- */
-
-export async function insertPool(sb: SupabaseClient, me: SessionUser, pool: PoolRequest) {
-  check(
-    await sb.from("pool_qarz_requests").insert({
-      id: pool.id,
-      borrower_id: me.id,
-      amount: pool.amount,
-      currency: pool.currency,
-      purpose: pool.purpose,
-      description: pool.description,
-      status: pool.status,
-      min_contribute: pool.minContribute,
-      repay_date: pool.repayIso,
-      schedule: pool.schedule,
-      repayments: pool.repayments,
-      card_last4: pool.cardLast4,
-      invited_ids: pool.invited.map((p) => p.id),
-    }),
-  );
-}
-
 export async function deleteDealRoom(sb: SupabaseClient, me: SessionUser, dealId: string) {
   const result = await sb.from("deal_rooms").delete().eq("id", dealId).eq("created_by", me.id);
   check(result);
@@ -817,17 +693,4 @@ export async function insertRating(
       comment: input.comment.trim(),
     }),
   );
-}
-
-/** Persists new contributions of the signed-in user. The database closes the request when it is full. */
-export async function savePoolChange(sb: SupabaseClient, me: SessionUser, prev: PoolRequest, next: PoolRequest) {
-  const known = new Set(prev.contributors.map((c) => c.id));
-  const fresh = next.contributors.filter((c) => c.id && !known.has(c.id) && c.person.id === me.id);
-  if (fresh.length) {
-    check(
-      await sb
-        .from("pool_qarz_contributions")
-        .insert(fresh.map((c) => ({ id: c.id, request_id: next.id, contributor_id: me.id, amount: c.amount }))),
-    );
-  }
 }

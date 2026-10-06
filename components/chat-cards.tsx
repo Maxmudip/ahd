@@ -1,13 +1,10 @@
 "use client";
 
-import { FileText, Pin } from "lucide-react";
+import { FileText } from "lucide-react";
 import { Avatar } from "@/components/avatar";
 import { Bubble } from "@/components/chat-ui";
-import { purposeClass } from "@/components/pool-status-badge";
-import { ProgressBar } from "@/components/progress-bar";
 import { initialsOf } from "@/lib/chat-helpers";
 import type { Deal } from "@/lib/deals";
-import { formatMoney, poolProgress, type PoolRequest } from "@/lib/pool-qarz";
 import { labeledParties } from "@/lib/roles";
 
 /** AI generated agreement, shown as a wide white card with a gold edge. */
@@ -149,74 +146,5 @@ export function SignatureCard({
         ) : null}
       </div>
     </Bubble>
-  );
-}
-
-/** Pool Qarz request as the first message of a group chat. */
-export function PoolCardMessage({
-  id,
-  pool,
-  canGive,
-  onGive,
-}: {
-  id: string;
-  pool: PoolRequest;
-  canGive: boolean;
-  onGive: () => void;
-}) {
-  const pct = poolProgress(pool);
-  return (
-    <Bubble id={id} side="them" name={pool.borrower.name} nameColor="#8F5430" wide accent>
-      <div className="py-1">
-        <div className="flex items-center gap-2">
-          <span className="text-[18px]" aria-hidden>
-            💰
-          </span>
-          <p className="text-[17px] font-semibold tracking-[-0.01em]">{formatMoney(pool.amount, pool.currency)}</p>
-        </div>
-        <span
-          className={`mt-1.5 inline-flex rounded-[4px] px-1.5 py-0.5 text-[12px] font-medium ${purposeClass(pool.purpose)}`}
-        >
-          {pool.purpose}
-        </span>
-        <p className="mt-2 text-[13.5px] leading-5">{pool.description}</p>
-        <div className="mt-3">
-          <ProgressBar value={pct} />
-        </div>
-        <p className="mt-1.5 text-[12.5px] text-ink2">
-          {formatMoney(pool.collected, pool.currency)} / {formatMoney(pool.amount, pool.currency)} · {pct}%
-        </p>
-        {canGive ? (
-          <button
-            type="button"
-            onClick={onGive}
-            className="mt-3 h-11 w-full rounded-[8px] md:h-9 bg-btn text-[13.5px] font-medium text-btnink hover:opacity-85"
-          >
-            Qarz berish
-          </button>
-        ) : null}
-      </div>
-    </Bubble>
-  );
-}
-
-/** Progress strip pinned at the top of a Pool Qarz group chat. */
-export function PinnedProgress({ pool }: { pool: PoolRequest }) {
-  const pct = poolProgress(pool);
-  return (
-    <div className="shrink-0 border-b border-line bg-panel px-4 py-2">
-      <div className="flex items-center gap-2 text-[13px]">
-        <Pin size={14} className="shrink-0 text-[#C9A84C]" />
-        <span className="min-w-0 flex-1 truncate text-ink">
-          <span className="font-semibold">{formatMoney(pool.collected, pool.currency)}</span>
-          <span className="text-ink2"> / {formatMoney(pool.amount, pool.currency)}</span>
-        </span>
-        <span className="font-semibold text-ink">{pct}%</span>
-        {pool.status === "collecting" ? <span className="text-ink2">⏱ {pool.daysLeft} kun</span> : null}
-      </div>
-      <div className="mt-1.5">
-        <ProgressBar value={pct} />
-      </div>
-    </div>
   );
 }

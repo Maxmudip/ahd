@@ -18,7 +18,7 @@ type AuthFormProps = {
 const points = [
   "Chatdan rasmiy kelishuv",
   "Raqamli imzo bir zumda",
-  "Pool Qarz — do'stlar bilan yordam",
+  "Qarz — ikki tomonlama kelishuv",
 ];
 
 export function AuthForm({ mode, initialError = "" }: AuthFormProps) {

@@ -519,7 +519,6 @@ export default function DealChatPage() {
 
   const plusItems: PillItem[] = [
     { label: "📄 Kelishuv yaratish", onClick: () => void generate(), disabled: !canGenerate || busy !== null },
-    { label: "💰 Qarz so'rash", onClick: () => router.push("/dashboard/pool-qarz/create") },
     { label: "🤖 AI tahlil", onClick: analyze, disabled: busy !== null },
     { label: "📎 Fayl yuborish", onClick: () => fileRef.current?.click() },
   ];
