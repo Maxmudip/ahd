@@ -1,362 +1,534 @@
 "use client";
 
-import { useState, type ReactNode } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
+
+const NAV = [
+  { href: "#muammo", label: "Muammo" },
+  { href: "#qanday", label: "Qanday ishlaydi" },
+  { href: "#xususiyatlar", label: "Xususiyatlar" },
+  { href: "#pool-qarz", label: "Pool Qarz" },
+  { href: "#narxlar", label: "Narxlar" },
+];
 
 export default function HomePage() {
   const [menu, setMenu] = useState(false);
 
-  return (
-    <div style={{ fontFamily: "'Inter', system-ui, -apple-system, sans-serif", background: "#f0f0ee", color: "#0a0a0a", minHeight: "100vh" }}>
+  useEffect(() => {
+    document.documentElement.classList.add("scroll-smooth");
+    return () => document.documentElement.classList.remove("scroll-smooth");
+  }, []);
 
-      {/* NAV */}
-      <nav style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "18px 32px", position: "sticky", top: 0, zIndex: 50, background: "#f0f0ee", borderBottom: "1px solid #e8e8e6" }}>
-        <div style={{ display: "flex", alignItems: "center", gap: 32 }}>
-          <Link href="/" style={{ width: 32, height: 32, background: "#0a0a0a", borderRadius: 8, display: "flex", alignItems: "center", justifyContent: "center", textDecoration: "none" }}>
-            <span style={{ color: "#fff", fontWeight: 800, fontSize: 14 }}>A</span>
+  return (
+    <div className="landing min-h-full bg-[#f5f5f5] text-[#111]">
+      <style>{`
+        .landing { --border: #e5e5e5; --accent: #111111; }
+        .landing ::selection { background: #111; color: #fff; }
+        .landing a:focus-visible,
+        .landing button:focus-visible { box-shadow: 0 0 0 2px #111; }
+      `}</style>
+
+      <header className="sticky top-0 z-40 border-b border-[#e5e5e5] bg-[#f5f5f5]/90 backdrop-blur">
+        <div className="mx-auto flex h-16 max-w-6xl items-center justify-between px-5">
+          <Link href="/" className="text-[20px] font-bold tracking-tight text-[#111]">
+            Ahd
           </Link>
-          <div style={{ display: "flex", gap: 24 }}>
-            <a href="#xususiyatlar" style={{ fontSize: 14, color: "#555", textDecoration: "none" }}>Xususiyatlar</a>
-            <a href="#narxlar" style={{ fontSize: 14, color: "#555", textDecoration: "none" }}>Narxlar</a>
+          <nav className="hidden items-center gap-7 md:flex">
+            {NAV.map((item) => (
+              <a key={item.href} href={item.href} className="text-[14px] text-[#666] hover:text-[#111]">
+                {item.label}
+              </a>
+            ))}
+          </nav>
+          <div className="flex items-center gap-3">
+            <Link
+              href="/register"
+              className="hidden h-10 items-center rounded-full bg-[#111] px-5 text-[14px] font-semibold text-white hover:bg-black md:inline-flex"
+            >
+              Boshlash
+            </Link>
+            <button
+              type="button"
+              aria-label="Menyu"
+              onClick={() => setMenu((v) => !v)}
+              className="inline-flex h-10 w-10 items-center justify-center rounded-full border border-[#ddd] md:hidden"
+            >
+              <span className="sr-only">Menyu</span>
+              <span className="flex w-4 flex-col gap-1">
+                <span className="block h-px bg-[#111]" />
+                <span className="block h-px bg-[#111]" />
+                <span className="block h-px bg-[#111]" />
+              </span>
+            </button>
           </div>
         </div>
-        <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
-          <Link href="/login" style={{ fontSize: 14, color: "#555", textDecoration: "none" }}>Kirish</Link>
-          <Link href="/register" style={{ fontSize: 14, fontWeight: 600, background: "#0a0a0a", color: "#fff", borderRadius: 100, padding: "8px 20px", textDecoration: "none" }}>
-            Boshlash
-          </Link>
-        </div>
-      </nav>
+        {menu ? (
+          <div className="border-t border-[#e5e5e5] px-5 py-4 md:hidden">
+            {NAV.map((item) => (
+              <a
+                key={item.href}
+                href={item.href}
+                onClick={() => setMenu(false)}
+                className="block py-2.5 text-[15px] text-[#333]"
+              >
+                {item.label}
+              </a>
+            ))}
+            <Link
+              href="/register"
+              className="mt-3 flex h-11 items-center justify-center rounded-full bg-[#111] text-[14px] font-semibold text-white"
+            >
+              Boshlash
+            </Link>
+          </div>
+        ) : null}
+      </header>
 
-      {/* HERO */}
-      <section style={{ position: "relative", overflow: "hidden", minHeight: "88vh", display: "flex", alignItems: "flex-end", padding: "0 32px 48px" }}>
-        <div style={{ position: "absolute", top: 0, right: 0, width: "52%", height: "100%", display: "flex", alignItems: "center", justifyContent: "center", pointerEvents: "none" }}>
-          <PhoneIllustration />
-        </div>
-        <div style={{ position: "relative", zIndex: 2, maxWidth: 560 }}>
-          <p style={{ fontSize: 13, color: "#666", marginBottom: 12, lineHeight: 1.4 }}>
-            Kelishuvni rasmiylashtiring.<br />AI yordamida, darhol.
-          </p>
-          <h1 style={{ fontSize: "clamp(52px, 8vw, 88px)", fontWeight: 900, lineHeight: 1.0, letterSpacing: "-0.03em", margin: "0 0 32px" }}>
-            Kelishing,<br />Imzolang
+      <section className="mx-auto grid max-w-6xl items-center gap-12 px-5 py-16 lg:grid-cols-2 lg:py-24">
+        <div>
+          <span className="inline-flex rounded-full border border-[#ddd] bg-white px-3 py-1 text-[12px] text-[#666]">
+            O&apos;zbekiston uchun AI kelishuv platformasi
+          </span>
+          <h1 className="mt-5 text-4xl leading-[1.15] font-bold tracking-tight text-[#111] sm:text-5xl lg:text-[52px]">
+            Do&apos;stingizdan qarz oldingizmi? Ishchi yolladingizmi? Ahd bilan kelishuvni rasmiylashtiring.
           </h1>
-          <div style={{ display: "flex", gap: 12 }}>
-            <Link href="/register" style={{ fontSize: 15, fontWeight: 600, background: "#0a0a0a", color: "#fff", borderRadius: 100, padding: "13px 28px", textDecoration: "none" }}>
+          <p className="mt-5 max-w-lg text-[17px] leading-7 text-[#666]">
+            Chat orqali gaplashing — AI shartnoma tuzib beradi. 2 daqiqada, bepul.
+          </p>
+          <div className="mt-8 flex flex-wrap gap-3">
+            <Link
+              href="/register"
+              className="inline-flex h-12 items-center rounded-full bg-[#111] px-6 text-[15px] font-semibold text-white hover:bg-black"
+            >
               Bepul boshlash
             </Link>
-            <a href="#xususiyatlar" style={{ fontSize: 15, fontWeight: 500, background: "transparent", color: "#0a0a0a", border: "1px solid #ccc", borderRadius: 100, padding: "13px 28px", textDecoration: "none" }}>
+            <a
+              href="#qanday"
+              className="inline-flex h-12 items-center rounded-full border border-[#ccc] bg-white px-6 text-[15px] font-semibold text-[#111] hover:border-[#111]"
+            >
               Qanday ishlaydi
             </a>
           </div>
+          <p className="mt-5 text-[13px] text-[#999]">Kredit kartasi shart emas · 2 daqiqada tayyor</p>
+        </div>
+        <div className="flex justify-center lg:justify-end">
+          <PhoneMock />
         </div>
       </section>
 
-      {/* TAGLINE */}
-      <section style={{ padding: "80px 32px", textAlign: "center", background: "#fff" }}>
-        <h2 style={{ fontSize: "clamp(28px, 5vw, 52px)", fontWeight: 800, lineHeight: 1.15, letterSpacing: "-0.025em", maxWidth: 680, margin: "0 auto 16px" }}>
-          Chat orqali muzokara,{" "}
-          <AvatarGroup />{" "}
-          AI kelishuv tuzsin
-        </h2>
-        <p style={{ fontSize: 16, color: "#666", maxWidth: 480, margin: "0 auto" }}>
-          Ikkala tomon chat qiladi. Shartlar belgilanadi. Hujjat avtomatik tayyorlanib, imzo kutadi.
-        </p>
-      </section>
-
-      {/* FEATURES */}
-      <section id="xususiyatlar" style={{ padding: "80px 32px", background: "#f0f0ee" }}>
-        <div style={{ maxWidth: 1100, margin: "0 auto", display: "grid", gridTemplateColumns: "1fr 1fr", gap: 48, alignItems: "start" }}>
-          <div>
-            <LaptopMock />
-            <div style={{ marginTop: 20, display: "flex", alignItems: "center", gap: 12, background: "#0a0a0a", color: "#fff", borderRadius: 100, padding: "12px 20px", width: "fit-content" }}>
-              <span style={{ fontSize: 13, fontWeight: 500 }}>Demo ko'rish</span>
-              <span style={{ width: 28, height: 28, background: "#333", borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 12 }}>›</span>
-            </div>
-          </div>
-          <div>
-            <p style={{ fontSize: 13, color: "#888", marginBottom: 32 }}>Bir platformada hamma narsa — muzokara, kelishuv, imzo.</p>
+      <section id="muammo" className="scroll-mt-16 px-5 py-20">
+        <div className="mx-auto max-w-6xl">
+          <p className="text-[12px] font-semibold tracking-[0.16em] text-[#888] uppercase">Nima uchun Ahd?</p>
+          <h2 className="mt-3 max-w-2xl text-3xl font-bold tracking-tight sm:text-4xl">Muammo nima?</h2>
+          <p className="mt-3 max-w-xl text-[16px] leading-7 text-[#666]">
+            Ko&apos;pchilik hali ham og&apos;zaki kelishadi. Keyin esdan chiqadi, bahs chiqadi, pul yo&apos;qoladi.
+          </p>
+          <div className="mt-10 grid gap-4 md:grid-cols-3">
             {[
-              { n: "01", title: "AI Kelishuv", body: "Chat tarixidan avtomatik shartnoma. Siz so'zlang, AI yozsin." },
-              { n: "02", title: "Pool Qarz", body: "Bir kishi so'raydi, do'stlar yig'adi. Har bir to'lov ochiq." },
-              { n: "03", title: "Raqamli Imzo", body: "Yuridik kuchga ega. PDF yuklab oling, arxivda saqlang." },
-            ].map((item, i) => (
-              <div key={i} style={{ display: "flex", gap: 24, padding: "24px 0", borderBottom: "1px solid #e8e8e6" }}>
-                <span style={{ fontSize: 12, color: "#aaa", fontWeight: 600, minWidth: 24, paddingTop: 3 }}>{item.n}</span>
-                <div>
-                  <p style={{ fontWeight: 700, fontSize: 16, marginBottom: 6 }}>{item.title}</p>
-                  <p style={{ fontSize: 14, color: "#666", lineHeight: 1.6 }}>{item.body}</p>
-                </div>
-              </div>
+              {
+                title: "Og'zaki kelishuvlar unutiladi",
+                body: "Do'stingizga pul berdingiz. Ikkalangiz ham eslaysiz — toki kelishmovchilik chiqmaguncha. Yozma dalil yo'q.",
+              },
+              {
+                title: "Advokat qimmat, vaqt yo'q",
+                body: "Oddiy qarz yoki ish uchun advokat chaqirish qimmat. Ahd shu ishni 2 daqiqada, chat orqali qiladi.",
+              },
+              {
+                title: "Telegram xabari hujjat emas",
+                body: "Chatda yozilgan shart sudda zaif. Ahd suhbatni yuridik kuchga ega shartnomaga aylantiradi.",
+              },
+            ].map((item) => (
+              <article key={item.title} className="rounded-2xl border border-[#e5e5e5] bg-white p-6">
+                <h3 className="text-[18px] font-bold tracking-tight">{item.title}</h3>
+                <p className="mt-2 text-[14px] leading-6 text-[#666]">{item.body}</p>
+              </article>
             ))}
-            <div style={{ marginTop: 32, background: "#0a0a0a", color: "#fff", borderRadius: 20, padding: "24px 28px" }}>
-              <p style={{ fontSize: 42, fontWeight: 900, letterSpacing: "-0.03em" }}>2 min</p>
-              <p style={{ fontSize: 13, color: "#888", marginTop: 4 }}>O'rtacha kelishuv tuzish vaqti</p>
-            </div>
           </div>
         </div>
       </section>
 
-      {/* POOL QARZ */}
-      <section id="pool-qarz" style={{ padding: "80px 32px", background: "#fff" }}>
-        <div style={{ maxWidth: 1100, margin: "0 auto" }}>
-          <div style={{ display: "inline-flex", alignItems: "center", gap: 8, border: "1px solid #e8e8e6", borderRadius: 100, padding: "6px 14px", marginBottom: 24 }}>
-            <span style={{ width: 6, height: 6, background: "#0a0a0a", borderRadius: "50%" }} />
-            <span style={{ fontSize: 12, fontWeight: 600 }}>YANGI</span>
+      <section id="qanday" className="scroll-mt-16 bg-white px-5 py-20">
+        <div className="mx-auto max-w-6xl">
+          <p className="text-[12px] font-semibold tracking-[0.16em] text-[#888] uppercase">Yechim</p>
+          <h2 className="mt-3 max-w-2xl text-3xl font-bold tracking-tight sm:text-4xl">Ahd qanday yordam beradi?</h2>
+          <p className="mt-3 max-w-xl text-[16px] leading-7 text-[#666]">
+            Uch qadam. Advokatsiz. Word ochmasdan. Ikkalangiz chatda qolasiz — hujjat o&apos;zi chiqadi.
+          </p>
+          <div className="mt-12 grid gap-6 md:grid-cols-3">
+            {[
+              {
+                n: "1",
+                title: "Sherigingizni taklif qiling",
+                body: "Email yoki havola yuboring. U qabul qilgach, umumiy chat ochiladi — ikkalangiz ham ko'rasiz.",
+              },
+              {
+                n: "2",
+                title: "Chat orqali shartlarni belgilang",
+                body: "Summa, muddat, avans — oddiy tilda yozing. WhatsAppdagi kabi, lekin hammasi saqlanadi.",
+              },
+              {
+                n: "3",
+                title: "AI tuzadi, ikkalangiz imzolaysiz",
+                body: "AI suhbatdan shartnoma yasaydi. Siz va sherigingiz raqamli imzo qo'yasiz — ish yakun.",
+              },
+            ].map((step) => (
+              <article key={step.n} className="rounded-2xl border border-[#e5e5e5] bg-[#f5f5f5] p-6">
+                <span className="inline-flex h-10 w-10 items-center justify-center rounded-full bg-[#111] text-[14px] font-bold text-white">
+                  {step.n}
+                </span>
+                <h3 className="mt-5 text-[18px] font-bold tracking-tight">{step.title}</h3>
+                <p className="mt-2 text-[14px] leading-6 text-[#666]">{step.body}</p>
+              </article>
+            ))}
           </div>
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 48, alignItems: "center" }}>
-            <div>
-              <h2 style={{ fontSize: "clamp(28px, 4vw, 44px)", fontWeight: 800, lineHeight: 1.1, letterSpacing: "-0.025em", marginBottom: 20 }}>
-                Pool Qarz —<br />guruh kreditlash
-              </h2>
-              <p style={{ fontSize: 16, color: "#555", lineHeight: 1.7, marginBottom: 28, maxWidth: 400 }}>
-                Bir kishi so'raydi, do'stlar yig'adi. Kim qancha bergani, qancha qolgani va qaytarish muddati hammaga ochiq.
-              </p>
-              {["Bir nechta qarz beruvchi", "Avtomatik hisob-kitob", "Shaffof tarix"].map((p, i) => (
-                <div key={i} style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 12 }}>
-                  <span style={{ width: 20, height: 20, background: "#0a0a0a", borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 10, color: "#fff", flexShrink: 0 }}>✓</span>
-                  <span style={{ fontSize: 15 }}>{p}</span>
-                </div>
+        </div>
+      </section>
+
+      <section id="xususiyatlar" className="scroll-mt-16 px-5 py-20">
+        <div className="mx-auto max-w-6xl">
+          <p className="text-[12px] font-semibold tracking-[0.16em] text-[#888] uppercase">Xususiyatlar</p>
+          <h2 className="mt-3 max-w-2xl text-3xl font-bold tracking-tight sm:text-4xl">Hamma narsa bir joyda</h2>
+          <p className="mt-3 max-w-xl text-[16px] leading-7 text-[#666]">
+            Muzokara, hujjat, imzo va ishonch — bitta ilovada. Alohida Word, PDF yoki advokat kerak emas.
+          </p>
+          <div className="mt-10 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+            {[
+              {
+                icon: "📄",
+                title: "AI Kelishuv",
+                body: "Siz chatda gaplashasiz. AI shartlarni o'qib, tayyor shartnoma chiqaradi. Qoralamani tuzatishingiz mumkin.",
+              },
+              {
+                icon: "👥",
+                title: "Pool Qarz",
+                body: "Bir kishi so'raydi, do'stlar yig'adi. Kim qancha qo'shgani hammaga ochiq — bahs chiqmaydi.",
+              },
+              {
+                icon: "✍️",
+                title: "Raqamli Imzo",
+                body: "Har ikki tomon elektron imzo qo'yadi. Hujjat yuklab olinadi va arxivda qoladi.",
+              },
+              {
+                icon: "💬",
+                title: "Real-vaqt Chat",
+                body: "WhatsAppdagi kabi yozishasiz. Farqi: suhbat keyin shartnomaga aylanadi, yo'qolmaydi.",
+              },
+              {
+                icon: "🤖",
+                title: "AI Vositachi",
+                body: "Nima unutilganini aytadi: muddat, avans, kechikish. Tinch muzokara — adolatli shartlar.",
+              },
+              {
+                icon: "⭐",
+                title: "Reyting tizimi",
+                body: "Ish yakunida baho qoldirasiz. Keyingi safar ishonchli odamni oldindan ko'rasiz.",
+              },
+            ].map((item) => (
+              <article key={item.title} className="rounded-2xl border border-[#e5e5e5] bg-white p-6">
+                <span className="text-[24px]" aria-hidden>
+                  {item.icon}
+                </span>
+                <h3 className="mt-4 text-[17px] font-bold tracking-tight">{item.title}</h3>
+                <p className="mt-2 text-[14px] leading-6 text-[#666]">{item.body}</p>
+              </article>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      <section id="pool-qarz" className="scroll-mt-16 bg-white px-5 py-20">
+        <div className="mx-auto grid max-w-6xl items-center gap-12 lg:grid-cols-2">
+          <div>
+            <span className="inline-flex rounded-full border border-[#ddd] px-3 py-1 text-[11px] font-bold tracking-[0.12em]">
+              YANGI
+            </span>
+            <h2 className="mt-4 text-3xl font-bold tracking-tight sm:text-4xl">Do&apos;stlardan qarz yig&apos;ish</h2>
+            <p className="mt-4 max-w-md text-[16px] leading-7 text-[#666]">
+              Bir kishi so&apos;raydi, do&apos;stlar yig&apos;adi. Kim qancha bergani, qancha qolgani va qaytarish muddati
+              hammaga ochiq. Yashirin chatlar yo&apos;q — hammasi bitta Pool Qarzda.
+            </p>
+            <ul className="mt-8 space-y-3">
+              {["Bir nechta qarz beruvchi", "Avtomatik hisob-kitob", "Hamma ko'radigan progress"].map((point) => (
+                <li key={point} className="flex items-center gap-3 text-[15px]">
+                  <span className="flex h-6 w-6 items-center justify-center rounded-full bg-[#111] text-[11px] text-white">
+                    ✓
+                  </span>
+                  {point}
+                </li>
               ))}
-            </div>
-            <PoolMock />
+            </ul>
           </div>
+          <PoolCard />
         </div>
       </section>
 
-      {/* STATS */}
-      <section style={{ padding: "64px 32px", background: "#0a0a0a" }}>
-        <div style={{ maxWidth: 1100, margin: "0 auto", display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 32 }}>
-          {[
-            { v: "10K+", l: "Yaratilgan kelishuv" },
-            { v: "98%", l: "Muvaffaqiyat darajasi" },
-            { v: "2 min", l: "O'rtacha vaqt" },
-            { v: "4.9★", l: "Foydalanuvchi bahosi" },
-          ].map((s, i) => (
-            <div key={i}>
-              <p style={{ fontSize: "clamp(32px, 4vw, 48px)", fontWeight: 900, color: "#fff", letterSpacing: "-0.03em" }}>{s.v}</p>
-              <p style={{ fontSize: 13, color: "#666", marginTop: 6 }}>{s.l}</p>
-            </div>
-          ))}
-        </div>
-      </section>
-
-      {/* REVIEWS */}
-      <section style={{ padding: "80px 32px", background: "#f0f0ee" }}>
-        <div style={{ maxWidth: 1100, margin: "0 auto" }}>
-          <h2 style={{ fontSize: "clamp(24px, 4vw, 40px)", fontWeight: 800, letterSpacing: "-0.025em", marginBottom: 40 }}>Foydalanuvchilar aytadi</h2>
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 20 }}>
+      <section className="px-5 py-20">
+        <div className="mx-auto max-w-6xl">
+          <h2 className="text-3xl font-bold tracking-tight sm:text-4xl">Foydalanuvchilar aytadi</h2>
+          <p className="mt-3 max-w-xl text-[16px] leading-7 text-[#666]">
+            Oddiy odamlar — freelancer, tadbirkor, pudratchi. Ular Ahdni nima uchun ishlatishini o&apos;zlari aytadi.
+          </p>
+          <div className="mt-10 grid gap-4 md:grid-cols-3">
             {[
-              { text: "Avval WhatsAppda kelishib, keyin Wordda yozardik. Ahd ikkalasini bir joyga qo'ydi.", name: "Jasur Karimov", role: "Freelance dizayner" },
-              { text: "Pool Qarz oilaviy yig'imni tartibga soldi. Kim qancha bergani ochiq, bahs yo'q.", name: "Madina Yusupova", role: "Tadbirkor" },
-              { text: "Mijozlarim endi og'zaki va'daga ishonmaydi. Chat + imzo — hammasi Ahd da qoladi.", name: "Sardor Aliyev", role: "Qurilish pudratchisi" },
-            ].map((r, i) => (
-              <div key={i} style={{ background: "#fff", borderRadius: 20, padding: "28px 24px" }}>
-                <p style={{ fontSize: 15, lineHeight: 1.65, color: "#222", marginBottom: 24 }}>"{r.text}"</p>
-                <p style={{ fontSize: 14, fontWeight: 600 }}>{r.name}</p>
-                <p style={{ fontSize: 13, color: "#888" }}>{r.role}</p>
-              </div>
+              {
+                text: "Mijoz logo so'radi. Avval WhatsAppda kelishib, keyin Word ochardim. Endi chat + imzo bir joyda — 10 daqiqada tugadi.",
+                name: "Jasur Karimov",
+                role: "Freelance dizayner",
+              },
+              {
+                text: "Oilaviy yig'imda kim qancha bergani aralashib ketardi. Pool Qarz hammaga ochiq ko'rsatadi. Bahs yo'q.",
+                name: "Madina Yusupova",
+                role: "Tadbirkor",
+              },
+              {
+                text: "Ishchilarga og'zaki va'da qilardim. Keyin 'aytmagan edingiz' degani chiqardi. Ahd da yozilgan va imzolangan.",
+                name: "Sardor Aliyev",
+                role: "Qurilish pudratchisi",
+              },
+            ].map((item) => (
+              <blockquote key={item.name} className="rounded-2xl border border-[#e5e5e5] bg-white p-6">
+                <p className="text-[15px] leading-7 text-[#222]">&ldquo;{item.text}&rdquo;</p>
+                <footer className="mt-6">
+                  <p className="text-[14px] font-semibold">{item.name}</p>
+                  <p className="text-[13px] text-[#888]">{item.role}</p>
+                </footer>
+              </blockquote>
             ))}
           </div>
         </div>
       </section>
 
-      {/* TEZ ORADA */}
-      <section style={{ padding: "80px 32px", background: "#fff" }}>
-        <div style={{ maxWidth: 1100, margin: "0 auto" }}>
-          <div style={{ display: "inline-flex", alignItems: "center", gap: 8, border: "1.5px dashed #ccc", borderRadius: 100, padding: "6px 14px", marginBottom: 24 }}>
-            <span style={{ width: 6, height: 6, background: "#bbb", borderRadius: "50%" }} />
-            <span style={{ fontSize: 12, fontWeight: 600, color: "#888" }}>TEZ ORADA</span>
-          </div>
-          <h2 style={{ fontSize: "clamp(24px, 4vw, 40px)", fontWeight: 800, letterSpacing: "-0.025em", marginBottom: 32 }}>Yangi imkoniyatlar</h2>
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 20 }}>
-            {[
-              { icon: "🎙️", title: "Ovozli kelishuvlar", body: "Gaplashing, AI yozib olsin. Og'zaki muzokaradan avtomatik hujjat." },
-              { icon: "✈️", title: "Telegram Mini App", body: "To'g'ridan-to'g'ri Telegramda. Chiqmay turib kelishing imzolang." },
-            ].map((c, i) => (
-              <div key={i} style={{ border: "1.5px dashed #ddd", borderRadius: 20, padding: "28px 24px", background: "#fafafa" }}>
-                <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 16 }}>
-                  <span style={{ fontSize: 28 }}>{c.icon}</span>
-                  <span style={{ fontSize: 12, color: "#aaa" }}>🔒 Tez orada</span>
-                </div>
-                <p style={{ fontSize: 18, fontWeight: 700, marginBottom: 8 }}>{c.title}</p>
-                <p style={{ fontSize: 14, color: "#777", lineHeight: 1.6 }}>{c.body}</p>
-              </div>
-            ))}
+      <section className="bg-white px-5 py-20">
+        <div className="mx-auto max-w-6xl">
+          <span className="inline-flex animate-pulse rounded-full border border-[#ddd] px-3 py-1 text-[11px] font-bold tracking-[0.14em] text-[#888]">
+            TEZ ORADA
+          </span>
+          <h2 className="mt-4 text-3xl font-bold tracking-tight sm:text-4xl">Yangi imkoniyatlar</h2>
+          <p className="mt-3 max-w-xl text-[16px] leading-7 text-[#666]">
+            Hozir yozasiz. Tez orada gapirasiz — yoki umuman Telegramdan chiqmasdan ishlaysiz.
+          </p>
+          <div className="mt-10 grid gap-4 md:grid-cols-2">
+            <article className="rounded-2xl border border-dashed border-[#ccc] bg-[#f5f5f5] p-6">
+              <p className="text-[13px] text-[#888]">🔒 Tez orada</p>
+              <h3 className="mt-3 text-[20px] font-bold">Ovozli kelishuvlar</h3>
+              <p className="mt-2 text-[14px] leading-6 text-[#666]">
+                Gaplashing, AI yozib olsin. Og&apos;zaki muzokara ham shartnomaga aylanadi.
+              </p>
+            </article>
+            <article className="rounded-2xl border border-dashed border-[#ccc] bg-[#f5f5f5] p-6">
+              <p className="text-[13px] text-[#888]">🔒 Tez orada</p>
+              <h3 className="mt-3 text-[20px] font-bold">Telegram Mini App</h3>
+              <p className="mt-2 text-[14px] leading-6 text-[#666]">
+                To&apos;g&apos;ridan-to&apos;g&apos;ri Telegramda. Ilovani ochmasdan kelishing va imzolang.
+              </p>
+            </article>
           </div>
         </div>
       </section>
 
-      {/* NARXLAR */}
-      <section id="narxlar" style={{ padding: "80px 32px", background: "#f0f0ee" }}>
-        <div style={{ maxWidth: 900, margin: "0 auto" }}>
-          <p style={{ fontSize: 13, color: "#888", marginBottom: 8 }}>Narxlar</p>
-          <h2 style={{ fontSize: "clamp(24px, 4vw, 40px)", fontWeight: 800, letterSpacing: "-0.025em", marginBottom: 40 }}>Oddiy tariflar</h2>
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 16 }}>
+      <section id="narxlar" className="scroll-mt-16 px-5 py-20">
+        <div className="mx-auto max-w-6xl">
+          <p className="text-[12px] font-semibold tracking-[0.16em] text-[#888] uppercase">Narxlar</p>
+          <h2 className="mt-3 text-3xl font-bold tracking-tight sm:text-4xl">Oddiy tariflar</h2>
+          <p className="mt-3 max-w-xl text-[16px] leading-7 text-[#666]">
+            Birinchi kelishuv bepul. Keyin ishingiz o&apos;ssin — tarif ham o&apos;sadi.
+          </p>
+          <div className="mt-10 grid gap-4 md:grid-cols-3">
             {[
-              { name: "Free", price: "0", period: "so'm", blurb: "Sinab ko'rish uchun", points: ["3 ta kelishuv / oy", "AI qoralama", "PDF yuklash"], featured: false },
-              { name: "Pro", price: "49 000", period: "so'm/oy", blurb: "Cheksiz ish", points: ["Cheksiz kelishuv", "AI vositachi", "Raqamli imzo"], featured: true },
-              { name: "Business", price: "149 000", period: "so'm/oy", blurb: "Jamoa uchun", points: ["Jamoa workspace", "Cheksiz a'zolar", "Admin boshqaruvi"], featured: false },
-            ].map((plan, i) => (
-              <div key={i} style={{ borderRadius: 20, padding: "28px 24px", background: plan.featured ? "#0a0a0a" : "#fff", color: plan.featured ? "#fff" : "#0a0a0a", border: plan.featured ? "none" : "1px solid #e8e8e6" }}>
-                <p style={{ fontSize: 12, fontWeight: 600, opacity: 0.6, marginBottom: 12 }}>{plan.name}</p>
-                <p style={{ fontSize: 36, fontWeight: 900, letterSpacing: "-0.03em" }}>
-                  {plan.price}<span style={{ fontSize: 13, fontWeight: 400, opacity: 0.6, marginLeft: 4 }}>{plan.period}</span>
+              {
+                name: "Free",
+                price: "0",
+                period: "so'm",
+                blurb: "Sinab ko'rish va birinchi hujjat uchun",
+                points: ["3 ta kelishuv / oy", "AI qoralama", "PDF yuklash"],
+                featured: false,
+              },
+              {
+                name: "Pro",
+                price: "49 000",
+                period: "so'm/oy",
+                blurb: "Doimiy ish va cheksiz kelishuv",
+                points: ["Cheksiz kelishuv", "AI vositachi", "Raqamli imzo"],
+                featured: true,
+              },
+              {
+                name: "Business",
+                price: "149 000",
+                period: "so'm/oy",
+                blurb: "Jamoa va bir nechta xodim uchun",
+                points: ["Jamoa workspace", "Cheksiz a'zolar", "Admin boshqaruvi"],
+                featured: false,
+              },
+            ].map((plan) => (
+              <article
+                key={plan.name}
+                className={`rounded-2xl border p-6 ${
+                  plan.featured ? "border-[#111] bg-[#111] text-white" : "border-[#e5e5e5] bg-white"
+                }`}
+              >
+                <p className="text-[13px] font-semibold tracking-wide uppercase opacity-70">{plan.name}</p>
+                <p className="mt-3 text-4xl font-bold tracking-tight">
+                  {plan.price}
+                  <span className="ml-1 text-[14px] font-medium opacity-60">{plan.period}</span>
                 </p>
-                <p style={{ fontSize: 13, opacity: 0.6, margin: "8px 0 20px" }}>{plan.blurb}</p>
-                {plan.points.map((p, j) => (
-                  <p key={j} style={{ fontSize: 14, marginBottom: 8, opacity: 0.85 }}>✓ {p}</p>
-                ))}
-                <Link href="/register" style={{ display: "flex", alignItems: "center", justifyContent: "center", marginTop: 24, padding: "11px 0", borderRadius: 100, fontSize: 14, fontWeight: 600, textDecoration: "none", background: plan.featured ? "#fff" : "#0a0a0a", color: plan.featured ? "#0a0a0a" : "#fff" }}>
+                <p className={`mt-2 text-[14px] ${plan.featured ? "text-[#aaa]" : "text-[#666]"}`}>{plan.blurb}</p>
+                <ul className="mt-6 space-y-2 text-[14px]">
+                  {plan.points.map((p) => (
+                    <li key={p}>✓ {p}</li>
+                  ))}
+                </ul>
+                <Link
+                  href="/register"
+                  className={`mt-8 flex h-11 items-center justify-center rounded-full text-[14px] font-semibold ${
+                    plan.featured ? "bg-white text-[#111]" : "bg-[#111] text-white"
+                  }`}
+                >
                   Boshlash
                 </Link>
-              </div>
+              </article>
             ))}
           </div>
         </div>
       </section>
 
-      {/* CTA */}
-      <section style={{ padding: "96px 32px", background: "#0a0a0a", textAlign: "center" }}>
-        <h2 style={{ fontSize: "clamp(36px, 6vw, 64px)", fontWeight: 900, color: "#fff", letterSpacing: "-0.03em", marginBottom: 16 }}>Bugun boshlang</h2>
-        <p style={{ fontSize: 16, color: "#666", marginBottom: 36 }}>Birinchi kelishuvingizni bepul tuzing.</p>
-        <Link href="/register" style={{ fontSize: 15, fontWeight: 600, background: "#fff", color: "#0a0a0a", borderRadius: 100, padding: "14px 32px", textDecoration: "none" }}>
-          Bepul ro'yxatdan o'tish
-        </Link>
-        <p style={{ fontSize: 13, color: "#555", marginTop: 16 }}>Kredit kartasi shart emas</p>
+      <section className="px-5 pb-20">
+        <div className="mx-auto max-w-6xl rounded-3xl border border-[#e5e5e5] bg-white px-6 py-16 text-center sm:px-12">
+          <h2 className="text-3xl font-bold tracking-tight sm:text-5xl">
+            Bugun birinchi kelishuvingizni tuzing — bepul
+          </h2>
+          <p className="mx-auto mt-4 max-w-lg text-[16px] text-[#666]">
+            Ro&apos;yxatdan o&apos;ting, sherikni chaqiring, chatda gaplashing. Hujjatni AI yozadi.
+          </p>
+          <Link
+            href="/register"
+            className="mt-8 inline-flex h-12 items-center rounded-full bg-[#111] px-8 text-[15px] font-semibold text-white hover:bg-black"
+          >
+            Bepul ro&apos;yxatdan o&apos;tish
+          </Link>
+          <p className="mt-4 text-[13px] text-[#999]">Kredit kartasi shart emas</p>
+        </div>
       </section>
 
-      {/* FOOTER */}
-      <footer style={{ padding: "48px 32px", borderTop: "1px solid #1a1a1a", background: "#0a0a0a" }}>
-        <div style={{ maxWidth: 1100, margin: "0 auto", display: "flex", justifyContent: "space-between", alignItems: "flex-start", flexWrap: "wrap", gap: 32 }}>
-          <div>
-            <p style={{ fontSize: 18, fontWeight: 800, color: "#fff", marginBottom: 6 }}>Ahd</p>
-            <p style={{ fontSize: 13, color: "#555" }}>So'zingiz hujjat bo'lsin.</p>
+      <footer className="border-t border-[#e5e5e5] bg-[#f5f5f5]">
+        <div className="mx-auto max-w-6xl px-5 py-14">
+          <div className="grid gap-10 sm:grid-cols-2 md:grid-cols-4">
+            <div>
+              <p className="text-[18px] font-bold">Ahd</p>
+              <p className="mt-2 text-[14px] leading-6 text-[#666]">So&apos;zingiz hujjat bo&apos;lsin.</p>
+            </div>
+            <div>
+              <p className="text-[13px] font-semibold text-[#888]">Mahsulot</p>
+              <ul className="mt-3 space-y-2">
+                <li>
+                  <a href="#xususiyatlar" className="text-[14px] text-[#666] hover:text-[#111]">
+                    Xususiyatlar
+                  </a>
+                </li>
+                <li>
+                  <a href="#pool-qarz" className="text-[14px] text-[#666] hover:text-[#111]">
+                    Pool Qarz
+                  </a>
+                </li>
+                <li>
+                  <a href="#narxlar" className="text-[14px] text-[#666] hover:text-[#111]">
+                    Narxlar
+                  </a>
+                </li>
+              </ul>
+            </div>
+            <div>
+              <p className="text-[13px] font-semibold text-[#888]">Kompaniya</p>
+              <ul className="mt-3 space-y-2">
+                <li>
+                  <a href="#qanday" className="text-[14px] text-[#666] hover:text-[#111]">
+                    Qanday ishlaydi
+                  </a>
+                </li>
+                <li>
+                  <Link href="/login" className="text-[14px] text-[#666] hover:text-[#111]">
+                    Kirish
+                  </Link>
+                </li>
+                <li>
+                  <Link href="/register" className="text-[14px] text-[#666] hover:text-[#111]">
+                    Ro&apos;yxatdan o&apos;tish
+                  </Link>
+                </li>
+              </ul>
+            </div>
+            <div>
+              <p className="text-[13px] font-semibold text-[#888]">Qo&apos;llab-quvvatlash</p>
+              <ul className="mt-3 space-y-2">
+                <li>
+                  <a href="mailto:info@useahd.com" className="text-[14px] text-[#666] hover:text-[#111]">
+                    Aloqa
+                  </a>
+                </li>
+                <li>
+                  <a href="#narxlar" className="text-[14px] text-[#666] hover:text-[#111]">
+                    Yordam
+                  </a>
+                </li>
+              </ul>
+            </div>
           </div>
-          <div style={{ display: "flex", gap: 48 }}>
-            {[
-              { title: "Mahsulot", links: [{ l: "Xususiyatlar", h: "#xususiyatlar" }, { l: "Narxlar", h: "#narxlar" }, { l: "Pool Qarz", h: "#pool-qarz" }] },
-              { title: "Kompaniya", links: [{ l: "Kirish", h: "/login" }, { l: "Ro'yxatdan o'tish", h: "/register" }, { l: "Aloqa", h: "mailto:info@useahd.com" }] },
-            ].map((col, i) => (
-              <div key={i}>
-                <p style={{ fontSize: 12, fontWeight: 600, color: "#555", marginBottom: 14 }}>{col.title}</p>
-                {col.links.map((link, j) => (
-                  <a key={j} href={link.h} style={{ display: "block", fontSize: 14, color: "#666", textDecoration: "none", marginBottom: 10 }}>{link.l}</a>
-                ))}
-              </div>
-            ))}
-          </div>
-        </div>
-        <div style={{ maxWidth: 1100, margin: "32px auto 0", borderTop: "1px solid #1a1a1a", paddingTop: 24 }}>
-          <p style={{ fontSize: 13, color: "#444" }}>© 2024 Ahd. Barcha huquqlar himoyalangan.</p>
+          <p className="mt-12 text-[13px] text-[#999]">© 2024 Ahd. Barcha huquqlar himoyalangan.</p>
         </div>
       </footer>
-
-      <style>{`
-        @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.3; } }
-        @media (max-width: 768px) {
-          .grid-2 { grid-template-columns: 1fr !important; }
-          .grid-3 { grid-template-columns: 1fr !important; }
-          .grid-4 { grid-template-columns: repeat(2, 1fr) !important; }
-          .hide-mobile { display: none !important; }
-        }
-      `}</style>
     </div>
   );
 }
 
-function PhoneIllustration() {
+function PhoneMock() {
   return (
-    <div style={{ position: "relative", width: 320, height: 480 }}>
-      <div style={{ position: "absolute", bottom: 0, right: 20, width: 200, height: 320, background: "linear-gradient(160deg, #d4d4d2 0%, #b8b8b5 100%)", borderRadius: "40% 30% 0 0 / 50% 40% 0 0", transform: "rotate(-8deg)" }} />
-      <div style={{ position: "absolute", bottom: 0, right: 0, width: 220, height: 180, background: "#0a0a0a", borderRadius: "30% 20% 0 0", transform: "rotate(-8deg)" }} />
-      <div style={{ position: "absolute", top: 20, left: 20, width: 180, height: 320, background: "#fff", borderRadius: 28, border: "8px solid #111", boxShadow: "0 24px 60px rgba(0,0,0,0.25)", overflow: "hidden", transform: "rotate(6deg)" }}>
-        <div style={{ width: 60, height: 6, background: "#111", borderRadius: 4, margin: "10px auto" }} />
-        <div style={{ padding: "8px 10px" }}>
-          <p style={{ fontSize: 8, fontWeight: 700, color: "#333", marginBottom: 8 }}>Ahd · Chat</p>
-          <div style={{ background: "#f5f5f5", borderRadius: 10, padding: "6px 8px", marginBottom: 6 }}>
-            <p style={{ fontSize: 7, color: "#444" }}>Logo dizayn — 3 000 000 so'm</p>
-          </div>
-          <div style={{ background: "#0a0a0a", borderRadius: 10, padding: "6px 8px", marginLeft: "20%", marginBottom: 6 }}>
-            <p style={{ fontSize: 7, color: "#fff" }}>Avans 40% qabul</p>
-          </div>
-          <div style={{ background: "#f0f0ee", borderRadius: 10, padding: "8px", border: "1px solid #ddd", marginTop: 10 }}>
-            <p style={{ fontSize: 7, fontWeight: 700, color: "#333" }}>Kelishuv tayyor ✓</p>
-            <p style={{ fontSize: 6, color: "#888", marginTop: 2 }}>AI qoralama · imzo kutilmoqda</p>
+    <div className="w-[min(100%,280px)] rounded-[2.5rem] border-[8px] border-[#222] bg-white shadow-xl">
+      <div className="mx-auto mt-3 h-5 w-20 rounded-full bg-[#111]" />
+      <div className="p-3 pb-5">
+        <p className="mb-3 text-center text-[11px] font-semibold text-[#888]">Jasur · Ijrochi</p>
+        <div className="space-y-2">
+          <p className="max-w-[88%] rounded-2xl rounded-tl-sm bg-[#f0f0f0] px-3 py-2 text-[12px] leading-4 text-[#222]">
+            Logo va landing 5 kunda, 3 000 000 so&apos;m.
+          </p>
+          <p className="ml-auto max-w-[88%] rounded-2xl rounded-tr-sm bg-[#111] px-3 py-2 text-[12px] leading-4 text-white">
+            Avans 40%, qolgani topshirishda.
+          </p>
+          <p className="max-w-[88%] rounded-2xl rounded-tl-sm bg-[#f0f0f0] px-3 py-2 text-[12px] leading-4 text-[#222]">
+            Kelishdik. Hujjatni tuzamizmi?
+          </p>
+          <div className="rounded-2xl border border-[#eee] bg-[#fafafa] px-3 py-2.5">
+            <p className="text-[12px] font-semibold text-[#111]">Kelishuv tayyor ✓</p>
+            <p className="mt-1 text-[11px] text-[#888]">AI qoralama · imzo kutilmoqda</p>
           </div>
         </div>
       </div>
-      <svg style={{ position: "absolute", top: 0, left: 0, width: "100%", height: "100%", pointerEvents: "none" }} viewBox="0 0 320 480">
-        <path d="M 20 100 Q 200 50 300 200" stroke="#ccc" strokeWidth="1" fill="none" opacity="0.5" />
-        <path d="M 10 200 Q 150 100 280 300" stroke="#ddd" strokeWidth="1" fill="none" opacity="0.4" />
-        <circle cx="290" cy="60" r="3" fill="#aaa" opacity="0.5" />
-        <text x="260" y="50" fontSize="20" opacity="0.4">✈</text>
-      </svg>
     </div>
   );
 }
 
-function AvatarGroup() {
+function PoolCard() {
   return (
-    <span style={{ display: "inline-flex", alignItems: "center", verticalAlign: "middle" }}>
-      {["#d4a0b0", "#a0b4d4", "#a0d4b0"].map((c, i) => (
-        <span key={i} style={{ width: 36, height: 36, borderRadius: "50%", background: c, border: "2px solid #fff", marginLeft: i > 0 ? -10 : 0, display: "inline-block" }} />
-      ))}
-      <span style={{ width: 36, height: 36, borderRadius: "50%", background: "#0a0a0a", border: "2px solid #fff", marginLeft: -10, display: "inline-flex", alignItems: "center", justifyContent: "center", fontSize: 14, color: "#fff", fontWeight: 700 }}>+</span>
-    </span>
-  );
-}
-
-function LaptopMock() {
-  return (
-    <div>
-      <div style={{ background: "#0a0a0a", borderRadius: "16px 16px 0 0", padding: "12px 16px 8px", border: "8px solid #1a1a1a" }}>
-        <div style={{ display: "flex", gap: 6, marginBottom: 10 }}>
-          {[0,1,2].map(i => <span key={i} style={{ width: 8, height: 8, borderRadius: "50%", background: "#333" }} />)}
-        </div>
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, minHeight: 180 }}>
-          <div style={{ background: "#1a1a1a", borderRadius: 10, padding: "10px 12px" }}>
-            <p style={{ fontSize: 9, color: "#666", marginBottom: 8 }}>Chat</p>
-            <div style={{ background: "#2a2a2a", borderRadius: 8, padding: "6px 8px", marginBottom: 6 }}>
-              <p style={{ fontSize: 8, color: "#ccc" }}>Muddat — 12-oktabr</p>
-            </div>
-            <div style={{ background: "#fff", borderRadius: 8, padding: "6px 8px", marginLeft: "20%" }}>
-              <p style={{ fontSize: 8, color: "#000" }}>Qabul. Imzolayman.</p>
-            </div>
-          </div>
-          <div style={{ background: "#111", borderRadius: 10, padding: "10px 12px" }}>
-            <p style={{ fontSize: 9, color: "#666", marginBottom: 8 }}>Kelishuv</p>
-            <p style={{ fontSize: 10, fontWeight: 700, color: "#fff" }}>1. Tomonlar</p>
-            <p style={{ fontSize: 8, color: "#666", marginTop: 4 }}>Tomon A: Muhammad</p>
-            <p style={{ fontSize: 8, color: "#666" }}>Tomon B: Jasur</p>
-            <div style={{ height: 1, background: "#2a2a2a", margin: "8px 0" }} />
-            <p style={{ fontSize: 10, fontWeight: 700, color: "#fff" }}>2. Shartlar</p>
-            <p style={{ fontSize: 8, color: "#666", marginTop: 4 }}>3 000 000 so'm</p>
-          </div>
-        </div>
+    <div className="rounded-3xl border border-[#e5e5e5] bg-[#f5f5f5] p-6">
+      <p className="text-[12px] font-semibold text-[#888]">Pool Qarz</p>
+      <p className="mt-1 text-[32px] font-bold tracking-tight">12 000 000</p>
+      <p className="text-[13px] text-[#999]">so&apos;m · ta&apos;lim uchun</p>
+      <div className="mt-4 h-2 overflow-hidden rounded-full bg-[#e5e5e5]">
+        <div className="h-full w-2/3 rounded-full bg-[#111]" />
       </div>
-      <div style={{ background: "#1a1a1a", height: 12, borderRadius: "0 0 4px 4px" }} />
-      <div style={{ background: "#111", height: 6, borderRadius: "0 0 8px 8px", width: "80%", margin: "0 auto" }} />
-    </div>
-  );
-}
-
-function PoolMock() {
-  return (
-    <div style={{ background: "#f5f5f5", borderRadius: 24, padding: 24, border: "1px solid #e8e8e6" }}>
-      <p style={{ fontSize: 12, color: "#888", marginBottom: 4 }}>Pool Qarz</p>
-      <p style={{ fontSize: 36, fontWeight: 900, letterSpacing: "-0.03em" }}>12 000 000</p>
-      <p style={{ fontSize: 12, color: "#aaa" }}>so'm · ta'lim uchun</p>
-      <div style={{ height: 8, background: "#e0e0e0", borderRadius: 100, margin: "16px 0 8px", overflow: "hidden" }}>
-        <div style={{ height: "100%", width: "67%", background: "#0a0a0a", borderRadius: 100 }} />
+      <p className="mt-2 text-[13px] text-[#666]">8 000 000 / 12 000 000 · 67%</p>
+      <div className="mt-5 space-y-3">
+        {[
+          ["MK", "Madina", "4 000 000"],
+          ["SA", "Sardor", "4 000 000"],
+        ].map(([ini, name, sum]) => (
+          <div key={name} className="flex items-center gap-3 rounded-2xl bg-white px-3 py-2.5">
+            <span className="flex h-8 w-8 items-center justify-center rounded-full bg-[#111] text-[11px] font-bold text-white">
+              {ini}
+            </span>
+            <span className="flex-1 text-[14px]">{name}</span>
+            <span className="text-[14px] font-semibold">{sum}</span>
+          </div>
+        ))}
       </div>
-      <p style={{ fontSize: 12, color: "#888", marginBottom: 20 }}>8 000 000 / 12 000 000 · 67%</p>
-      {[["MK", "Madina Karimova", "4 000 000"], ["SA", "Sardor Aliyev", "4 000 000"]].map(([ini, name, sum], i) => (
-        <div key={i} style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 12 }}>
-          <span style={{ width: 32, height: 32, background: "#0a0a0a", borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 11, fontWeight: 700, color: "#fff", flexShrink: 0 }}>{ini}</span>
-          <span style={{ flex: 1, fontSize: 14 }}>{name}</span>
-          <span style={{ fontSize: 14, fontWeight: 600 }}>{sum}</span>
-        </div>
-      ))}
     </div>
   );
 }
