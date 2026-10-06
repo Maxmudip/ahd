@@ -1,5 +1,5 @@
 import Anthropic from "@anthropic-ai/sdk";
-import { createAnthropic, describeKey, readAnthropicKey } from "@/lib/anthropic";
+import { CLAUDE_MODEL, createAnthropic, describeKey, readAnthropicKey } from "@/lib/anthropic";
 import { buildTranscript } from "@/lib/chat-transcript";
 import { NextResponse, type NextRequest } from "next/server";
 import { createServerSupabase } from "@/lib/supabase-server";
@@ -102,7 +102,7 @@ export async function POST(request: NextRequest) {
   try {
     const client = createAnthropic(apiKey);
     const response = await client.messages.create({
-      model: "claude-3-5-sonnet-20241022",
+      model: CLAUDE_MODEL,
       max_tokens: 4096,
       system: SYSTEM_PROMPT,
       messages: [{ role: "user", content: userContent }],
