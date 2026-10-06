@@ -1,468 +1,503 @@
-import { Fragment } from "react";
+"use client";
+
+import { useEffect, useState, type ReactNode } from "react";
 import Link from "next/link";
-import { Check, MessageSquare, PenLine, Sparkles } from "lucide-react";
-import { Button } from "@/components/button";
-import { LandingHeader } from "@/components/landing-header";
-import { Logo } from "@/components/logo";
 
-const features = [
+const NAV = [
+  { href: "#xususiyatlar", label: "Xususiyatlar" },
+  { href: "#pool-qarz", label: "Pool Qarz" },
+  { href: "#narxlar", label: "Narxlar" },
+];
+
+const FEATURES = [
+  { icon: "📄", title: "AI Kelishuv", body: "Chat tarixidan avtomatik shartnoma yaratadi" },
+  { icon: "💰", title: "Pool Qarz", body: "Guruh qarz — hamma qatnashadi, hamma ko'radi" },
+  { icon: "✍️", title: "Raqamli Imzo", body: "Yuridik kuchga ega elektron imzo" },
+  { icon: "💬", title: "Real-vaqt Chat", body: "WhatsApp kabi muzokaralar" },
+  { icon: "🤖", title: "AI Vositachi", body: "Kelishuv jarayonida aqlli maslahatlar" },
+  { icon: "⭐", title: "Reyting tizimi", body: "Ishonchli hamkorlarni toping" },
+];
+
+const STEPS = [
+  { n: "01", title: "Taklif yuboring", body: "Email orqali sherikingizni chaqiring. U qabul qilgach chat ochiladi." },
+  { n: "02", title: "Muzokara qiling", body: "Shartlarni oddiy tilda yozing. AI muhokamani kuzatib turadi." },
+  { n: "03", title: "Imzolang", body: "Hujjat tayyor. Har ikki tomon raqamli imzo qo'yadi — ish yakun." },
+];
+
+const POOL_POINTS = [
+  "Bir nechta qarz beruvchi",
+  "Avtomatik hisob-kitob",
+  "Shaffof tarix",
+];
+
+const STATS = [
+  { value: "10K+", label: "Yaratilgan kelishuv" },
+  { value: "98%", label: "Muvaffaqiyat darajasi" },
+  { value: "2 min", label: "O'rtacha tuzish vaqti" },
+  { value: "4.9★", label: "Foydalanuvchi bahosi" },
+];
+
+const PLANS = [
+  { name: "Free", price: "0", period: "so'm", blurb: "Sinab ko'rish uchun", points: ["3 ta kelishuv / oy", "AI qoralama", "PDF yuklash"] },
+  { name: "Pro", price: "49 000", period: "so'm/oy", blurb: "Cheksiz ish", points: ["Cheksiz kelishuv", "AI vositachi", "Raqamli imzo"], featured: true },
+  { name: "Business", price: "149 000", period: "so'm/oy", blurb: "Jamoa uchun", points: ["Jamoa workspace", "Cheksiz a'zolar", "Admin boshqaruvi"] },
+];
+
+const REVIEWS = [
   {
-    title: "Chatdan kelishuv",
-    body: "Oddiy suhbat rasmiy bandlarga aylanadi. Tomonlar, muddat va summa o'z joyida qoladi.",
-    points: ["Jonli muhokama", "Avtomatik bandlar", "Bitta xona"],
-    mock: <ChatMock />,
+    text: "Avval WhatsAppda kelishib, keyin Wordda yozardik. Ahd ikkalasini bir joyga qo'ydi — 10 daqiqada imzo qo'ydik.",
+    name: "Jasur Karimov",
+    role: "Freelance dizayner",
   },
   {
-    title: "AI tahlil",
-    body: "Ahd suhbatni o'qiydi va shartnoma qoralamasini yozadi. Siz faqat tekshirasiz va imzolaysiz.",
-    points: ["Tuzilgan bo'limlar", "O'zbekcha matn", "Bir zumda qoralama"],
-    mock: <AgreementMock />,
+    text: "Pool Qarz oilaviy yig'imni tartibga soldi. Kim qancha bergani ochiq, bahs yo'q.",
+    name: "Madina Yusupova",
+    role: "Tadbirkor",
   },
   {
-    title: "Pool Qarz",
-    body: "Do'stlar bir maqsadga pul yig'adi. Progress, muddat va qaytarish jadvali ochiq turadi.",
-    points: ["Umumiy yig'ish", "Ishtirokchilar", "Qaytarish grafigi"],
-    mock: <PoolMock />,
+    text: "Mijozlarim endi og'zaki va'daga ishonmaydi. Chat + imzo — hammasi Ahd da qoladi.",
+    name: "Sardor Aliyev",
+    role: "Qurilish pudratchisi",
   },
 ];
 
-const steps = [
-  {
-    n: "01",
-    title: "Chat",
-    body: "Deal room oching. Shartlarni oddiy tilda yozing.",
-    icon: MessageSquare,
-  },
-  {
-    n: "02",
-    title: "AI tahlil",
-    body: "Ahd suhbatni tuzilgan shartnomaga aylantiradi.",
-    icon: Sparkles,
-  },
-  {
-    n: "03",
-    title: "Imzolang",
-    body: "Har ikki tomon raqamli imzo qo'yadi. PDF saqlanadi.",
-    icon: PenLine,
-  },
-];
-
-const plans = [
-  {
-    name: "Free",
-    price: "0 so'm",
-    period: "",
-    blurb: "3 ta kelishuv / oy",
-    features: ["3 ta kelishuv oyiga", "1 foydalanuvchi", "PDF eksport", "Pool Qarz asosiy"],
-    recommended: false,
-  },
-  {
-    name: "Pro",
-    price: "49,000",
-    period: "so'm/oy",
-    blurb: "Cheksiz kelishuv",
-    features: ["Cheksiz kelishuv", "AI tahlil", "Raqamli imzo", "Prioritet yordam"],
-    recommended: true,
-  },
-  {
-    name: "Business",
-    price: "149,000",
-    period: "so'm/oy",
-    blurb: "Jamoa uchun",
-    features: ["Jamoa workspace", "Cheksiz a'zolar", "Umumiy hujjatlar", "Admin boshqaruvi"],
-    recommended: false,
-  },
-];
-
-const footer = {
+const FOOTER = {
   Mahsulot: [
-    { label: "Kelishuvlar", href: "#imkoniyatlar" },
-    { label: "Pool Qarz", href: "#imkoniyatlar" },
-    { label: "AI tahlil", href: "#imkoniyatlar" },
+    { label: "Xususiyatlar", href: "#xususiyatlar" },
+    { label: "Pool Qarz", href: "#pool-qarz" },
     { label: "Narxlar", href: "#narxlar" },
   ],
   Kompaniya: [
-    { label: "Biz haqimizda", href: "#qanday" },
     { label: "Qanday ishlaydi", href: "#qanday" },
     { label: "Kirish", href: "/login" },
-  ],
-  Aloqa: [
-    { label: "muhammad@ahd.uz", href: "mailto:muhammad@ahd.uz" },
-    { label: "Toshkent", href: "#narxlar" },
     { label: "Ro'yxatdan o'tish", href: "/register" },
+  ],
+  "Qo'llab-quvvatlash": [
+    { label: "Aloqa", href: "mailto:muhammad@ahd.uz" },
+    { label: "Yordam", href: "#narxlar" },
+    { label: "Maxfiylik", href: "#" },
   ],
 };
 
 export default function HomePage() {
+  const [menu, setMenu] = useState(false);
+
+  useEffect(() => {
+    document.documentElement.classList.add("scroll-smooth");
+    return () => document.documentElement.classList.remove("scroll-smooth");
+  }, []);
+
   return (
-    <div className="flex min-h-full flex-col overflow-x-clip bg-white text-[#37352F]">
-      <LandingHeader />
-
-      <main>
-        <section className="bg-[linear-gradient(180deg,#FFFFFF_0%,#FAF9F7_100%)] px-6 pt-32 pb-16 text-center">
-          <div className="mx-auto inline-flex rounded-full bg-[#F5F4F0] px-3 py-1 text-[13px] text-[#787774]">
-            O&apos;zbekiston uchun <span className="ml-1 text-[#C9A84C]">#1</span>
-            <span className="ml-1">kelishuv platformasi</span>
-          </div>
-          <h1 className="mx-auto mt-6 max-w-4xl text-[40px] leading-[1.08] font-extrabold tracking-[-0.04em] text-[#111] sm:text-[68px]">
-            <span className="block">Tanish interfeys,</span>
-            <span className="mt-1 block">
-              <span className="text-[#C9A84C]">kuchli</span> himoya
-            </span>
-          </h1>
-          <p className="mx-auto mt-6 max-w-[560px] text-[18px] leading-8 text-[#787774] sm:text-[20px]">
-            Kelishuvlarni xabar yozgandek oson tuzing. Ahd suhbatni shartnomaga aylantiradi — siz esa raqamli imzo
-            bilan tasdiqlaysiz.
-          </p>
-          <div className="mt-8 flex flex-wrap items-center justify-center gap-3">
-            <Button href="/register">Bepul boshlash</Button>
-            <Button href="#mahsulot" variant="outline">
-              Demo ko&apos;rish
-            </Button>
-          </div>
-          <p className="mt-4 text-[13px] text-[#ACABA8]">Kredit kartasi shart emas • Bepul plan bor</p>
-
-          <div id="mahsulot" className="mx-auto mt-16 max-w-5xl">
-            <div className="overflow-hidden rounded-[16px] border border-[#E9E9E7] bg-white text-left shadow-[0_32px_80px_rgba(17,17,17,0.12)]">
-              <AppMockup />
-            </div>
-          </div>
-        </section>
-
-        <section className="bg-[#F5F4F0] px-6 py-6">
-          <div className="mx-auto flex max-w-3xl flex-col items-center justify-center gap-3 sm:flex-row">
-            <div className="flex -space-x-2">
-              {["MK", "JA", "DR", "BT", "NU"].map((initials) => (
-                <span
-                  key={initials}
-                  className="inline-flex h-8 w-8 items-center justify-center rounded-full border-2 border-[#F5F4F0] bg-[#EBE8E1] text-[11px] font-medium text-[#37352F]"
-                >
-                  {initials}
-                </span>
-              ))}
-            </div>
-            <p className="text-[14px] text-[#37352F]">1,200+ foydalanuvchi ishonadi</p>
-          </div>
-        </section>
-
-        <section id="imkoniyatlar" className="scroll-mt-16 px-6 py-24">
-          <div className="mx-auto max-w-5xl text-center">
-            <h2 className="text-[36px] font-bold tracking-[-0.03em] text-[#111] sm:text-[48px]">
-              Hamma narsangiz bir joyda
-            </h2>
-            <p className="mx-auto mt-3 max-w-xl text-[16px] text-[#787774]">
-              Muhokama, hujjat va umumiy yordam — alohida ilovalarsiz.
-            </p>
-          </div>
-          <div className="mx-auto mt-20 flex max-w-5xl flex-col gap-24">
-            {features.map((feature, index) => (
-              <article key={feature.title} className="grid items-center gap-10 md:grid-cols-2 md:gap-16">
-                <div className={index % 2 === 1 ? "md:order-2" : ""}>{feature.mock}</div>
-                <div className={index % 2 === 1 ? "md:order-1" : ""}>
-                  <h3 className="text-[30px] font-semibold tracking-[-0.02em] text-[#111]">{feature.title}</h3>
-                  <p className="mt-3 text-[16px] leading-7 text-[#787774]">{feature.body}</p>
-                  <ul className="mt-6 space-y-2">
-                    {feature.points.map((point) => (
-                      <li key={point} className="flex items-center gap-2 text-[15px] text-[#37352F]">
-                        <Check size={16} className="text-[#C9A84C]" />
-                        {point}
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-              </article>
+    <div className="landing-bw min-h-full bg-black text-white">
+      <style>{`
+        .landing-bw { --border: #222222; --accent: #ffffff; }
+        .landing-bw ::selection { background: #333333; color: #ffffff; }
+        .landing-bw a:focus-visible,
+        .landing-bw button:focus-visible { box-shadow: 0 0 0 2px #ffffff; }
+        .landing-bw .ring-black { border-color: #000000 !important; }
+        .landing-bw .ring-white { border-color: #ffffff !important; }
+        .landing-bw .ring-line { border-color: #222222 !important; }
+        .landing-bw .ring-soft { border-color: #333333 !important; }
+        .landing-bw .ring-pale { border-color: #cccccc !important; }
+        .landing-bw .ring-dash { border-color: #333333 !important; }
+      `}</style>
+      <header className="sticky top-0 z-40 border-b border-[#222] ring-line bg-black">
+        <div className="mx-auto flex h-16 max-w-6xl items-center justify-between px-5">
+          <Link href="/" className="text-[20px] font-bold tracking-tight text-white">
+            Ahd
+          </Link>
+          <nav className="hidden items-center gap-8 md:flex">
+            {NAV.map((item) => (
+              <a key={item.href} href={item.href} className="text-[14px] text-[#999] hover:text-white">
+                {item.label}
+              </a>
             ))}
+          </nav>
+          <div className="flex items-center gap-3">
+            <Link
+              href="/register"
+              className="hidden h-10 items-center rounded-full bg-white px-5 text-[14px] font-semibold text-black hover:bg-[#f5f5f5] md:inline-flex"
+            >
+              Boshlash
+            </Link>
+            <button
+              type="button"
+              aria-label="Menyu"
+              onClick={() => setMenu((v) => !v)}
+              className="inline-flex h-10 w-10 items-center justify-center rounded-full border border-[#333] ring-soft md:hidden"
+            >
+              <span className="sr-only">Menyu</span>
+              <span className="flex w-4 flex-col gap-1">
+                <span className="block h-px bg-white" />
+                <span className="block h-px bg-white" />
+                <span className="block h-px bg-white" />
+              </span>
+            </button>
           </div>
-        </section>
+        </div>
+        {menu ? (
+          <div className="border-t border-[#222] ring-line px-5 py-4 md:hidden">
+            {NAV.map((item) => (
+              <a
+                key={item.href}
+                href={item.href}
+                onClick={() => setMenu(false)}
+                className="block py-2.5 text-[15px] text-[#ccc]"
+              >
+                {item.label}
+              </a>
+            ))}
+            <Link
+              href="/register"
+              className="mt-3 flex h-11 items-center justify-center rounded-full bg-white text-[14px] font-semibold text-black"
+            >
+              Boshlash
+            </Link>
+          </div>
+        ) : null}
+      </header>
 
-        <section id="qanday" className="scroll-mt-16 bg-[#111] px-6 py-24 text-white">
-          <div className="mx-auto max-w-[1100px]">
-            <h2 className="text-center text-[36px] font-bold tracking-[-0.03em] sm:text-[48px]">Qanday ishlaydi</h2>
-            <div className="mt-16 flex flex-col gap-4 md:flex-row md:items-center">
-              {steps.map((step, index) => {
-                const Icon = step.icon;
-                return (
-                  <Fragment key={step.n}>
-                    <article
-                      className="min-w-0 flex-1 rounded-[16px] border border-[#2A2A2A] bg-[#1C1C1C] px-8 py-10"
-                      style={{ borderColor: "#2A2A2A" }}
-                    >
-                      <span className="inline-flex rounded-full bg-[#C9A84C] px-2.5 py-0.5 text-[13px] font-bold text-[#111]">
-                        {step.n}
-                      </span>
-                      <div className="mt-6 flex h-16 w-16 items-center justify-center rounded-full bg-[#2A2A2A]">
-                        <Icon size={48} strokeWidth={1.5} className="text-white" />
-                      </div>
-                      <h3 className="mt-6 text-[20px] font-bold">{step.title}</h3>
-                      <p className="mt-3 text-[15px] leading-[1.6] text-[#999]">{step.body}</p>
-                    </article>
-                    {index < steps.length - 1 ? (
-                      <span className="hidden shrink-0 text-[22px] leading-none text-[#C9A84C] md:block" aria-hidden>
-                        →
-                      </span>
-                    ) : null}
-                  </Fragment>
-                );
-              })}
-            </div>
-            <div className="mt-14 text-center">
+      <section className="relative overflow-hidden bg-black">
+        <div className="mx-auto grid min-h-[calc(100dvh-64px)] max-w-6xl items-center gap-12 px-5 py-16 lg:grid-cols-2 lg:py-20">
+          <div>
+            <span className="inline-flex rounded-full border border-[#333] ring-soft px-3 py-1 text-[12px] tracking-wide text-[#999]">
+              AI bilan ishlaydigan
+            </span>
+            <h1 className="mt-6 text-5xl leading-[1.05] font-black tracking-tight text-white sm:text-6xl lg:text-7xl xl:text-8xl">
+              Og&apos;zaki kelishuvlar
+              <br />
+              endi rasmiy
+            </h1>
+            <p className="mt-6 max-w-md text-[17px] leading-7 text-[#999]">
+              Chat orqali muzokara qiling, AI shartnoma tuzsin, raqamli imzo qo&apos;ying
+            </p>
+            <div className="mt-8 flex flex-wrap gap-3">
               <Link
                 href="/register"
-                className="inline-flex h-11 items-center rounded-[6px] bg-[#C9A84C] px-5 text-[14px] font-semibold text-[#111] transition-colors duration-100 hover:bg-[#B3943E]"
+                className="inline-flex h-12 items-center rounded-full bg-white px-6 text-[15px] font-semibold text-black hover:bg-[#f5f5f5]"
               >
-                Hoziroq boshlang
+                Bepul boshlash
               </Link>
+              <a
+                href="#qanday"
+                className="ring-white inline-flex h-12 items-center rounded-full border border-white px-6 text-[15px] font-semibold text-white hover:bg-white hover:text-black"
+              >
+                Qanday ishlaydi
+              </a>
+            </div>
+            <div className="mt-10 flex flex-wrap gap-x-8 gap-y-3 text-[13px] text-[#666]">
+              <span>
+                <span className="font-semibold text-white">10,000+</span> kelishuv
+              </span>
+              <span>
+                <span className="font-semibold text-white">98%</span> muvaffaqiyat
+              </span>
+              <span>
+                <span className="font-semibold text-white">2 daqiqa</span>
+              </span>
             </div>
           </div>
-        </section>
-
-        <section id="narxlar" className="scroll-mt-16 border-t border-[#E7E4DC] px-6 py-24">
-          <div className="mx-auto max-w-5xl text-center">
-            <h2 className="text-[36px] font-bold tracking-[-0.03em] text-[#111] sm:text-[48px]">Oddiy narxlar</h2>
-            <p className="mt-3 text-[16px] text-[#787774]">Yashirin to&apos;lov yo&apos;q. Istalgan vaqt to&apos;xtatish mumkin.</p>
+          <div className="flex justify-center lg:justify-end">
+            <PhoneFrame>
+              <ChatScreen />
+            </PhoneFrame>
           </div>
-          <div className="mx-auto mt-14 grid max-w-5xl gap-4 md:grid-cols-3">
-            {plans.map((plan) => (
+        </div>
+      </section>
+
+      <section id="xususiyatlar" className="scroll-mt-16 bg-white text-black">
+        <div className="mx-auto max-w-6xl px-5 py-24">
+          <p className="text-[12px] font-semibold tracking-[0.18em] text-[#666]">XUSUSIYATLAR</p>
+          <h2 className="mt-3 text-4xl font-bold tracking-tight sm:text-5xl">Hamma narsa bir joyda</h2>
+          <div className="mt-12 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+            {FEATURES.map((item) => (
               <article
-                key={plan.name}
-                className={`flex flex-col rounded-[4px] border bg-white p-6 ${
-                  plan.recommended
-                    ? "border-[#C9A84C] shadow-[0_12px_40px_rgba(201,168,76,0.12)]"
-                    : "border-[#E7E4DC]"
-                }`}
+                key={item.title}
+                className="ring-black rounded-2xl border border-black bg-[#f5f5f5] p-6 transition hover:shadow-lg"
               >
-                <p className="text-[14px] text-[#787774]">{plan.name}</p>
-                <p className="mt-3 text-[32px] font-bold tracking-[-0.03em] text-[#111]">
-                  {plan.price}{" "}
-                  {plan.period ? <span className="text-[16px] font-medium text-[#787774]">{plan.period}</span> : null}
-                </p>
-                <p className="mt-2 text-[14px] text-[#787774]">{plan.blurb}</p>
-                <ul className="mt-6 flex-1 space-y-2">
-                  {plan.features.map((item) => (
-                    <li key={item} className="flex items-start gap-2 text-[14px] text-[#37352F]">
-                      <Check size={16} className="mt-0.5 shrink-0 text-[#C9A84C]" />
-                      {item}
-                    </li>
-                  ))}
-                </ul>
-                <Button href="/register" variant={plan.recommended ? "primary" : "secondary"} className="mt-8">
-                  Boshlash
-                </Button>
+                <span className="text-[28px]" aria-hidden>
+                  {item.icon}
+                </span>
+                <h3 className="mt-4 text-[18px] font-bold tracking-tight">{item.title}</h3>
+                <p className="mt-2 text-[14px] leading-6 text-[#666]">{item.body}</p>
               </article>
             ))}
           </div>
-        </section>
-      </main>
+        </div>
+      </section>
 
-      <footer className="border-t border-[#E7E4DC] bg-white">
-        <div className="mx-auto grid max-w-6xl gap-10 px-6 py-16 sm:grid-cols-2 lg:grid-cols-4">
-          <div>
-            <Logo />
-            <p className="mt-3 max-w-[220px] text-[14px] leading-6 text-[#787774]">
-              So&apos;zingiz hujjat bo&apos;lsin. Chat, AI va raqamli imzo bir joyda.
-            </p>
+      <section id="qanday" className="scroll-mt-16 bg-black">
+        <div className="mx-auto max-w-6xl px-5 py-24">
+          <h2 className="text-4xl font-bold tracking-tight text-white sm:text-5xl">3 qadamda tayyor</h2>
+          <div className="relative mt-14 grid gap-10 md:grid-cols-3">
+            <div className="pointer-events-none absolute top-[22px] right-8 left-8 hidden h-px bg-[#333] md:block" />
+            {STEPS.map((step) => (
+              <div key={step.n} className="relative">
+                <span className="ring-soft relative z-10 inline-flex h-11 w-11 items-center justify-center rounded-full border border-[#333] bg-black text-[13px] font-bold text-white">
+                  {step.n}
+                </span>
+                <h3 className="mt-5 text-[20px] font-bold tracking-tight text-white">{step.title}</h3>
+                <p className="mt-2 text-[14px] leading-6 text-[#999]">{step.body}</p>
+              </div>
+            ))}
           </div>
-          {Object.entries(footer).map(([title, items]) => (
-            <div key={title}>
-              <p className="text-[14px] font-medium text-[#111]">{title}</p>
-              <ul className="mt-3 md:space-y-2">
-                {items.map((item) => (
-                  <li key={item.label}>
-                    {item.href.startsWith("/") ? (
-                      <Link href={item.href} className="inline-flex min-h-11 items-center break-anywhere text-[14px] text-[#787774] hover:text-[#111] md:min-h-0">
-                        {item.label}
-                      </Link>
-                    ) : (
-                      <a href={item.href} className="inline-flex min-h-11 items-center break-anywhere text-[14px] text-[#787774] hover:text-[#111] md:min-h-0">
-                        {item.label}
-                      </a>
-                    )}
-                  </li>
-                ))}
-              </ul>
+          <div className="ring-line mt-16 overflow-hidden rounded-3xl border border-[#222] bg-[#111] p-4 shadow-2xl md:p-8">
+            <DeskMock />
+          </div>
+        </div>
+      </section>
+
+      <section id="pool-qarz" className="scroll-mt-16 bg-[#f5f5f5] text-black">
+        <div className="mx-auto grid max-w-6xl items-center gap-12 px-5 py-24 lg:grid-cols-2">
+          <div>
+            <span className="ring-black inline-flex rounded-full border border-black px-3 py-1 text-[11px] font-bold tracking-[0.14em]">
+              YANGI
+            </span>
+            <h2 className="mt-4 text-4xl font-bold tracking-tight sm:text-5xl">Pool Qarz — Guruh kreditlash</h2>
+            <p className="mt-5 max-w-md text-[16px] leading-7 text-[#666]">
+              Bir kishi so&apos;raydi, do&apos;stlar yig&apos;adi. Kim qancha qo&apos;shgani, qancha qolgani va qaytarish
+              muddati hammaga ochiq.
+            </p>
+            <ul className="mt-8 space-y-3">
+              {POOL_POINTS.map((point) => (
+                <li key={point} className="flex items-center gap-3 text-[15px]">
+                  <span className="flex h-6 w-6 items-center justify-center rounded-full bg-black text-[12px] text-white">
+                    ✓
+                  </span>
+                  {point}
+                </li>
+              ))}
+            </ul>
+          </div>
+          <div className="flex justify-center">
+            <PhoneFrame light>
+              <PoolScreen />
+            </PhoneFrame>
+          </div>
+        </div>
+      </section>
+
+      <section className="bg-white text-black">
+        <div className="mx-auto grid max-w-6xl grid-cols-2 gap-10 px-5 py-24 md:grid-cols-4">
+          {STATS.map((stat) => (
+            <div key={stat.label}>
+              <p className="text-5xl font-black tracking-tight text-black">{stat.value}</p>
+              <p className="mt-2 text-[14px] text-[#666]">{stat.label}</p>
             </div>
           ))}
         </div>
-        <div className="border-t border-[#E7E4DC]">
-          <div className="mx-auto flex max-w-6xl flex-col gap-2 px-6 py-5 text-[13px] text-[#ACABA8] sm:flex-row sm:items-center sm:justify-between">
-            <p>© 2026 Ahd</p>
-            <p>O&apos;zbekiston 🇺🇿</p>
+      </section>
+
+      <section id="narxlar" className="scroll-mt-16 bg-[#f5f5f5] text-black">
+        <div className="mx-auto max-w-6xl px-5 py-24">
+          <p className="text-[12px] font-semibold tracking-[0.18em] text-[#666]">NARXLAR</p>
+          <h2 className="mt-3 text-4xl font-bold tracking-tight sm:text-5xl">Oddiy tariflar</h2>
+          <div className="mt-12 grid gap-4 md:grid-cols-3">
+            {PLANS.map((plan) => (
+              <article
+                key={plan.name}
+                className={`rounded-2xl border p-6 ${
+                  plan.featured ? "ring-black border-black bg-black text-white" : "ring-pale border-[#ccc] bg-white"
+                }`}
+              >
+                <p className="text-[13px] font-semibold tracking-wide uppercase opacity-70">{plan.name}</p>
+                <p className="mt-3 text-4xl font-black tracking-tight">
+                  {plan.price}
+                  <span className="ml-1 text-[14px] font-medium opacity-60">{plan.period}</span>
+                </p>
+                <p className="mt-2 text-[14px] opacity-70">{plan.blurb}</p>
+                <ul className="mt-6 space-y-2 text-[14px]">
+                  {plan.points.map((p) => (
+                    <li key={p}>✓ {p}</li>
+                  ))}
+                </ul>
+                <Link
+                  href="/register"
+                  className={`mt-8 flex h-11 items-center justify-center rounded-full text-[14px] font-semibold ${
+                    plan.featured ? "bg-white text-black" : "bg-black text-white"
+                  }`}
+                >
+                  Boshlash
+                </Link>
+              </article>
+            ))}
           </div>
+        </div>
+      </section>
+
+      <section className="bg-black">
+        <div className="mx-auto max-w-6xl px-5 py-24">
+          <h2 className="text-4xl font-bold tracking-tight text-white sm:text-5xl">Foydalanuvchilar aytadi</h2>
+          <div className="mt-12 grid gap-4 md:grid-cols-3">
+            {REVIEWS.map((item) => (
+              <blockquote key={item.name} className="rounded-2xl bg-[#111] p-6">
+                <p className="text-[15px] leading-7 text-white">&ldquo;{item.text}&rdquo;</p>
+                <footer className="mt-6">
+                  <p className="text-[14px] font-semibold text-[#999]">{item.name}</p>
+                  <p className="text-[13px] text-[#666]">{item.role}</p>
+                </footer>
+              </blockquote>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      <section className="bg-[#111]">
+        <div className="mx-auto max-w-6xl px-5 py-24">
+          <span className="ring-soft inline-flex animate-pulse rounded-full border border-[#333] px-3 py-1 text-[11px] font-bold tracking-[0.16em] text-[#ccc]">
+            TEZ ORADA
+          </span>
+          <h2 className="mt-4 text-4xl font-bold tracking-tight text-white sm:text-5xl">Yangi imkoniyatlar</h2>
+          <div className="mt-10 grid gap-4 md:grid-cols-2">
+            <article className="ring-dash rounded-2xl border border-dashed border-[#333] bg-[#1a1a1a]/80 p-6">
+              <p className="text-[13px] text-[#666]">🔒 Tez orada</p>
+              <h3 className="mt-3 text-[22px] font-bold text-white">🎙️ Ovozli kelishuvlar</h3>
+              <p className="mt-2 text-[14px] text-[#999]">Gaplashing, AI yozib olsin</p>
+            </article>
+            <article className="ring-dash rounded-2xl border border-dashed border-[#333] bg-[#1a1a1a]/80 p-6">
+              <p className="text-[13px] text-[#666]">🔒 Tez orada</p>
+              <h3 className="mt-3 text-[22px] font-bold text-white">✈️ Telegram Mini App</h3>
+              <p className="mt-2 text-[14px] text-[#999]">To&apos;g&apos;ridan-to&apos;g&apos;ri Telegramda</p>
+            </article>
+          </div>
+        </div>
+      </section>
+
+      <section className="bg-white text-black">
+        <div className="mx-auto max-w-3xl px-5 py-28 text-center">
+          <h2 className="text-5xl font-black tracking-tight sm:text-6xl">Bugun boshlang</h2>
+          <p className="mx-auto mt-4 max-w-md text-[16px] text-[#666]">
+            Birinchi kelishuvingizni bepul tuzing. Kartasiz, navbatsiz.
+          </p>
+          <Link
+            href="/register"
+            className="mt-8 inline-flex h-14 items-center rounded-full bg-black px-8 text-[16px] font-semibold text-white hover:bg-[#111]"
+          >
+            Bepul ro&apos;yxatdan o&apos;tish
+          </Link>
+          <p className="mt-4 text-[13px] text-[#999]">Kredit kartasi shart emas</p>
+        </div>
+      </section>
+
+      <footer className="border-t border-[#222] ring-line bg-black">
+        <div className="mx-auto max-w-6xl px-5 py-16">
+          <div className="grid gap-10 md:grid-cols-4">
+            <div>
+              <p className="text-[20px] font-bold text-white">Ahd</p>
+              <p className="mt-2 text-[14px] leading-6 text-[#666]">So&apos;zingiz hujjat bo&apos;lsin.</p>
+              <div className="mt-5 flex gap-3 text-[13px] text-[#666]">
+                <span className="ring-soft flex h-9 w-9 items-center justify-center rounded-full border border-[#333]">Tg</span>
+                <span className="ring-soft flex h-9 w-9 items-center justify-center rounded-full border border-[#333]">Ig</span>
+                <span className="ring-soft flex h-9 w-9 items-center justify-center rounded-full border border-[#333]">X</span>
+              </div>
+            </div>
+            {Object.entries(FOOTER).map(([title, links]) => (
+              <div key={title}>
+                <p className="text-[13px] font-semibold tracking-wide text-[#999] uppercase">{title}</p>
+                <ul className="mt-4 space-y-2">
+                  {links.map((link) => (
+                    <li key={link.label}>
+                      <a href={link.href} className="text-[14px] text-[#666] hover:text-white">
+                        {link.label}
+                      </a>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            ))}
+          </div>
+          <p className="mt-14 text-[13px] text-[#666]">© 2024 Ahd. Barcha huquqlar himoyalangan.</p>
         </div>
       </footer>
     </div>
   );
 }
 
-function AppMockup() {
-  const chats = [
-    { i: "NP", name: "Ofis ijarasi — Toshkent", time: "14:22", prev: "Qabul. Kommunal alohida.", unread: 1, active: true },
-    { i: "DC", name: "IT xizmatlari shartnomasi", time: "Kecha", prev: "✍️ Imzolash kutilmoqda", unread: 2 },
-    { i: "JA", name: "Jasur — Tibbiy xarajat", time: "2 soat", prev: "Bobur 400 000 so'm qo'shdi ✓", unread: 3 },
-    { i: "AB", name: "Hamkorlik memorandumi", time: "12-sent", prev: "✓✓ Yakunlangan", unread: 0, done: true },
-  ];
+function PhoneFrame({ children, light = false }: { children: ReactNode; light?: boolean }) {
   return (
-    <div className="flex h-[440px] sm:h-[460px]">
-      <aside className="hidden w-[280px] shrink-0 border-r border-[#E9E9E7] bg-white sm:flex sm:flex-col">
-        <div className="flex h-[52px] items-center justify-between border-b border-[#E9E9E7] px-4">
-          <Logo href="/" />
-          <span className="text-[16px] text-[#667781]">✎</span>
-        </div>
-        <div className="px-3 py-2.5">
-          <div className="flex h-8 items-center rounded-full bg-[#F0F2F5] px-3.5 text-[12px] text-[#667781]">
-            Qidirish yoki yangi boshlash
-          </div>
-          <div className="mt-2 flex gap-1.5 text-[11.5px] font-medium">
-            <span className="rounded-full bg-[#111] px-2.5 py-1 text-white">Kelishuvlar</span>
-            <span className="rounded-full bg-[#F0F2F5] px-2.5 py-1 text-[#667781]">Pool Qarz</span>
-            <span className="rounded-full bg-[#F0F2F5] px-2.5 py-1 text-[#667781]">Arxiv</span>
-          </div>
-        </div>
-        <div className="flex-1">
-          {chats.map((chat) => (
-            <div key={chat.name} className={`flex h-[64px] items-center gap-2.5 px-3 ${chat.active ? "bg-[#F0F2F5]" : ""}`}>
-              <span className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-[#EADFC2] text-[13px] font-semibold text-[#6B5520]">
-                {chat.i}
-              </span>
-              <span className="min-w-0 flex-1">
-                <span className="flex items-baseline justify-between gap-2">
-                  <span className="truncate text-[13px] font-semibold text-[#111]">{chat.name}</span>
-                  <span className="shrink-0 text-[11px] text-[#667781]">{chat.time}</span>
-                </span>
-                <span className="mt-0.5 flex items-center justify-between gap-2">
-                  <span className={`truncate text-[12px] ${chat.done ? "text-[#2E9E5B]" : "text-[#667781]"}`}>{chat.prev}</span>
-                  {chat.unread ? (
-                    <span className="inline-flex h-[18px] min-w-[18px] items-center justify-center rounded-full bg-[#111] px-1 text-[10.5px] font-semibold text-white">
-                      {chat.unread}
-                    </span>
-                  ) : null}
-                </span>
-              </span>
-            </div>
-          ))}
-        </div>
-      </aside>
-
-      <div className="flex min-w-0 flex-1 flex-col bg-[#F0F2F5]">
-        <div className="flex h-[52px] shrink-0 items-center gap-2.5 border-b border-[#E9E9E7] bg-white px-4">
-          <span className="inline-flex h-9 w-9 items-center justify-center rounded-full bg-[#EADFC2] text-[12px] font-semibold text-[#6B5520]">
-            NP
-          </span>
-          <span className="min-w-0 flex-1">
-            <span className="block truncate text-[13.5px] font-semibold text-[#111]">Ofis ijarasi — Toshkent</span>
-            <span className="block truncate text-[11.5px] text-[#667781]">Navoiy Plaza MChJ</span>
-          </span>
-          <span className="hidden rounded-full bg-[#F0F2F5] px-2 py-0.5 text-[11px] font-medium text-[#111] md:block">Kelishuv</span>
-          <span className="rounded-[3px] bg-[#F6E6D8] px-1.5 py-0.5 text-[11px] font-medium text-[#8F5430]">Imzolash</span>
-        </div>
-
-        <div className="flex-1 space-y-2 overflow-hidden px-4 py-3">
-          <div className="flex justify-center">
-            <span className="rounded-full bg-white px-3 py-0.5 text-[11px] font-medium text-[#667781] shadow-sm">Bugun</span>
-          </div>
-          <div className="flex w-full justify-start">
-            <div className="mr-auto max-w-[80%] rounded-[0_12px_12px_12px] border border-[#E9E9E7] bg-white px-2.5 pt-1.5 pb-1 md:max-w-[65%]">
-              <p className="text-[11.5px] font-semibold text-[#8A6B2E]">Navoiy Plaza</p>
-              <p className="text-[13px] leading-[1.4] text-[#111]">Ijara 6 oy, oylik 8 mln so&apos;m. Kafolat — 1 oy.</p>
-              <p className="mt-0.5 text-right text-[10.5px] text-[#667781]">14:20</p>
-            </div>
-          </div>
-          <div className="flex w-full justify-end">
-            <div className="ml-auto max-w-[80%] rounded-[12px_0_12px_12px] bg-[#111] md:max-w-[65%] px-2.5 pt-1.5 pb-1">
-              <p className="text-[13px] leading-[1.4] text-white">Qabul. Kommunal alohida to&apos;lanadi.</p>
-              <p className="mt-0.5 flex items-center justify-end gap-1 text-[10.5px] text-white/60">
-                14:22 <span className="text-[#C9A84C]">✓✓</span>
-              </p>
-            </div>
-          </div>
-          <div className="flex w-full justify-start">
-            <div className="mr-auto w-full max-w-[300px] rounded-[0_12px_12px_12px] border border-l-4 border-[#E9E9E7] border-l-[#C9A84C] bg-white px-3 py-2">
-              <p className="text-[13px] font-semibold text-[#111]">📄 Kelishuv tayyorlandi</p>
-              <p className="mt-1 line-clamp-2 rounded-[6px] bg-[#F0F2F5] px-2 py-1.5 text-[11.5px] leading-4 text-[#667781]">
-                <span className="font-semibold text-[#111]">1. Tomonlar.</span> Ijaraga beruvchi va ijarachi 6 oy muddatga...
-              </p>
-              <div className="mt-2 flex gap-1.5 text-[12px] font-medium">
-                <span className="flex-1 rounded-[8px] border border-[#E9E9E7] py-1.5 text-center text-[#111]">Ko&apos;rish</span>
-                <span className="flex-1 rounded-[8px] bg-[#111] py-1.5 text-center text-white">Imzolash</span>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <div className="flex h-[52px] shrink-0 items-center gap-2 border-t border-[#E9E9E7] bg-white px-3">
-          <span className="inline-flex h-8 w-8 items-center justify-center rounded-full bg-[#F0F2F5] text-[18px] text-[#667781]">+</span>
-          <span className="flex h-8 flex-1 items-center rounded-full bg-[#F0F2F5] px-3.5 text-[12.5px] text-[#667781]">Xabar yozing...</span>
-          <span className="inline-flex h-8 w-8 items-center justify-center rounded-full bg-[#111] text-[14px] text-white">→</span>
-        </div>
-      </div>
+    <div
+      className={`ring-line w-[min(100%,280px)] rounded-[2.5rem] border-[8px] shadow-2xl ${
+        light ? "border-[#111] bg-white" : "border-[#222] bg-[#1a1a1a]"
+      }`}
+    >
+      <div className="mx-auto mt-3 h-5 w-20 rounded-full bg-[#111]" />
+      <div className="p-3 pb-5">{children}</div>
     </div>
   );
 }
 
-function ChatMock() {
+function ChatScreen() {
   return (
-    <div className="overflow-hidden rounded-[6px] border border-[#E7E4DC] bg-white shadow-[0_12px_40px_rgba(17,17,17,0.06)]">
-      <div className="border-b border-[#E7E4DC] px-4 py-3 text-[14px] font-medium">Muhokama</div>
-      <div className="space-y-4 px-4 py-4">
-        <Comment name="Siz" text="Ijara 6 oy, oylik 8 mln so'm. Kafolat — 1 oy." />
-        <Comment name="Navoiy Plaza" text="Qabul. Kommunal alohida. Imzo bugun." />
-      </div>
-      <div className="border-t border-[#E7E4DC] bg-[#F5F4F0] px-4 py-4">
-        <p className="text-[12px] tracking-[0.04em] text-[#ACABA8] uppercase">Hujjat</p>
-        <p className="mt-1 text-[16px] font-semibold text-[#111]">Ofis ijarasi — Toshkent</p>
-        <p className="mt-1 text-[13px] text-[#787774]">3 band tayyor · Imzo kutilmoqda</p>
-      </div>
-    </div>
-  );
-}
-
-function Comment({ name, text }: { name: string; text: string }) {
-  return (
-    <div>
-      <p className="text-[14px] font-semibold text-[#37352F]">{name}</p>
-      <p className="mt-0.5 text-[14px] leading-6 text-[#37352F]">{text}</p>
-    </div>
-  );
-}
-
-function AgreementMock() {
-  return (
-    <div className="rounded-[6px] border border-[#E7E4DC] bg-white p-5 shadow-[0_12px_40px_rgba(17,17,17,0.06)]">
-      <div className="space-y-2 border-b border-[#E7E4DC] pb-3 text-[13px]">
-        <p>
-          <span className="inline-block w-24 text-[#787774]">Holat</span>
-          <span className="rounded-[3px] bg-[#F6E6D8] px-1.5 py-0.5 text-[12px] font-medium text-[#8F5430]">Imzolash</span>
+    <div className="rounded-2xl bg-[#111] p-3">
+      <p className="mb-3 text-center text-[11px] font-semibold text-[#666]">Jasur · Ijrochi</p>
+      <div className="space-y-2">
+        <p className="max-w-[85%] rounded-2xl rounded-tl-sm bg-[#333] px-3 py-2 text-[12px] leading-4 text-[#f5f5f5]">
+          Logo va landing 5 kunda, 3 000 000 so&apos;m.
         </p>
-        <p>
-          <span className="inline-block w-24 text-[#787774]">Ishtirokchi</span>
-          <span className="rounded-[3px] bg-[#F6EFD9] px-1 text-[13px] font-medium text-[#8A6B2E]">@Muhammad</span>
+        <p className="ml-auto max-w-[85%] rounded-2xl rounded-tr-sm bg-white px-3 py-2 text-[12px] leading-4 text-black">
+          Avans 40%, qolgani topshirishda.
         </p>
+        <p className="max-w-[85%] rounded-2xl rounded-tl-sm bg-[#333] px-3 py-2 text-[12px] leading-4 text-[#f5f5f5]">
+          Kelishdik. Hujjatni tuzamizmi?
+        </p>
+        <div className="ring-soft rounded-2xl border border-[#333] bg-[#1a1a1a] px-3 py-2.5">
+          <p className="text-[12px] font-semibold text-white">Kelishuv tayyor ✓</p>
+          <p className="mt-1 text-[11px] text-[#999]">AI qoralama · imzo kutilmoqda</p>
+        </div>
       </div>
-      <h3 className="mt-4 text-[24px] font-semibold text-[#111]">IT xizmatlari</h3>
-      <p className="mt-2 text-[14px] leading-6 text-[#37352F]">
-        Ijrochi MVP dasturini 6 hafta ichida topshiradi. Qiymat 42 000 AQSh dollari, ikki qismda.
-      </p>
-      <div className="mt-4 rounded-[4px] bg-[#F5F4F0] p-3 text-[13px] text-[#37352F]">✍️ Imzo kutilmoqda — Digital Craft</div>
     </div>
   );
 }
 
-function PoolMock() {
+function PoolScreen() {
   return (
-    <div className="overflow-hidden rounded-[4px] border border-[#E7E4DC] bg-white shadow-[0_12px_40px_rgba(17,17,17,0.06)]">
-      <div className="flex h-24 items-center justify-center bg-[#F5F4F0]">
-        <p className="text-[22px] font-semibold tracking-[-0.02em] text-[#111]">2 000 000 so&apos;m</p>
+    <div className="rounded-2xl bg-white p-3 text-black">
+      <p className="text-[11px] font-semibold text-[#666]">Pool Qarz</p>
+      <p className="mt-1 text-[22px] font-black tracking-tight">12 000 000</p>
+      <p className="text-[11px] text-[#999]">so&apos;m · ta&apos;lim</p>
+      <div className="mt-3 h-1.5 overflow-hidden rounded-full bg-[#f5f5f5]">
+        <div className="h-full w-2/3 rounded-full bg-black" />
       </div>
-      <div className="px-4 py-3">
-        <p className="text-[14px] font-semibold text-[#37352F]">Jasur Aliyev</p>
-        <div className="mt-2 flex gap-1.5">
-          <span className="rounded-[3px] bg-[#FDEBEC] px-1.5 py-0.5 text-[12px] font-medium text-[#C4554D]">Tibbiy xarajat</span>
-          <span className="rounded-[3px] bg-[#F6EFD9] px-1.5 py-0.5 text-[12px] font-medium text-[#8A6B2E]">Yig&apos;ilmoqda</span>
+      <p className="mt-2 text-[11px] text-[#666]">8 000 000 / 12 000 000 · 67%</p>
+      <div className="mt-4 space-y-2">
+        {[
+          ["MK", "Madina", "4 000 000"],
+          ["SA", "Sardor", "4 000 000"],
+        ].map(([ini, name, sum]) => (
+          <div key={name} className="flex items-center gap-2">
+            <span className="flex h-7 w-7 items-center justify-center rounded-full bg-black text-[10px] font-bold text-white">
+              {ini}
+            </span>
+            <span className="flex-1 text-[12px]">{name}</span>
+            <span className="text-[12px] font-semibold">{sum}</span>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function DeskMock() {
+  return (
+    <div className="grid gap-4 md:grid-cols-[1.1fr_0.9fr]">
+      <div className="rounded-2xl bg-[#1a1a1a] p-4">
+        <p className="text-[12px] font-semibold text-[#666]">Chat</p>
+        <div className="mt-3 space-y-2">
+          <p className="max-w-[80%] rounded-xl bg-[#333] px-3 py-2 text-[13px] text-[#f5f5f5]">
+            Muddat — 12-oktabr. Kehikish 1% / kun.
+          </p>
+          <p className="ml-auto max-w-[75%] rounded-xl bg-white px-3 py-2 text-[13px] text-black">
+            Qabul. Imzolayman.
+          </p>
         </div>
-        <div className="mt-3 h-1 overflow-hidden rounded-full bg-[#EBE8E1]">
-          <div className="h-full w-[62%] bg-[#C9A84C]" />
-        </div>
-        <p className="mt-2 text-[13px] text-[#787774]">👤 3 kishi • ⏱ 5 kun</p>
+      </div>
+      <div className="rounded-2xl bg-[#0a0a0a] p-4">
+        <p className="text-[12px] font-semibold text-[#666]">Hujjat</p>
+        <p className="mt-3 text-[16px] font-bold text-white">1. Tomonlar</p>
+        <p className="mt-2 text-[13px] leading-5 text-[#999]">Tomon A — Mijoz: Muhammad</p>
+        <p className="text-[13px] leading-5 text-[#999]">Tomon B — Ijrochi: Jasur</p>
+        <div className="ring-dash mt-4 h-8 rounded-lg border border-dashed border-[#333]" />
+        <div className="ring-dash mt-2 h-8 rounded-lg border border-dashed border-[#333]" />
       </div>
     </div>
   );
