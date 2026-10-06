@@ -416,7 +416,7 @@ export default function HomePage() {
               <p className="text-[13px] font-semibold text-[#888]">Qo&apos;llab-quvvatlash</p>
               <ul className="mt-3 space-y-2">
                 <li>
-                  <a href="mailto:info@useahd.com" className="text-[14px] text-[#666] hover:text-[#111]">
+                  <a href="tel:+971566066729" className="text-[14px] text-[#666] hover:text-[#111]">
                     Aloqa
                   </a>
                 </li>
@@ -428,7 +428,7 @@ export default function HomePage() {
               </ul>
             </div>
           </div>
-          <p className="mt-12 text-[13px] text-[#999]">© 2024 Ahd. Barcha huquqlar himoyalangan.</p>
+          <p className="mt-12 text-[13px] text-[#999]">© 2026 Ahd. Barcha huquqlar himoyalangan.</p>
         </div>
       </footer>
     </div>
