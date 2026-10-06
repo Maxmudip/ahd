@@ -1,19 +1,34 @@
 "use client";
 
-import type { AgreementDocument, DealStatus, Party } from "@/lib/deals";
+import type { AgreementDocument, Deal, DealStatus } from "@/lib/deals";
 import { Button } from "@/components/button";
 import { Mention } from "@/components/mention";
 import { StatusBadge } from "@/components/status-badge";
+import { labeledParties, type DealRoleSource, type LabeledParty } from "@/lib/roles";
+
+function isTomonlarClause(title: string) {
+  return /^tomonlar$/i.test(title.trim());
+}
 
 export function AgreementPaper({
   agreement,
   status,
   onSign,
+  deal,
 }: {
   agreement: AgreementDocument;
   status?: DealStatus;
   onSign?: (partyName: string) => void;
+  deal?: Pick<Deal, "createdBy" | "initiatorRole">;
 }) {
+  const source: DealRoleSource = {
+    createdBy: deal?.createdBy,
+    initiatorRole: deal?.initiatorRole,
+    parties: agreement.parties,
+  };
+  const parties = labeledParties(source);
+  const otherClauses = agreement.clauses.filter((clause) => !isTomonlarClause(clause.title));
+
   return (
     <article className="mx-auto w-full max-w-[720px] pb-8">
       <div className="border-t border-[#E9E9E7]">
@@ -37,7 +52,16 @@ export function AgreementPaper({
         <Marked text={agreement.subject} />
       </p>
 
-      {agreement.clauses.map((clause) => (
+      <section className="mt-8">
+        <h3 className="text-[24px] font-semibold tracking-[-0.02em] text-[#111]">1. Tomonlar</h3>
+        <ul className="mt-3 space-y-2 text-[16px] leading-[1.7] text-[#37352F]">
+          {parties.map((party) => (
+            <li key={`${party.letter}-${party.name}`}>{party.tomonLine}</li>
+          ))}
+        </ul>
+      </section>
+
+      {otherClauses.map((clause) => (
         <section key={clause.number} className="mt-8">
           <h3 className="text-[24px] font-semibold tracking-[-0.02em] text-[#111]">
             {clause.number}.{clause.title ? ` ${clause.title}` : ""}
@@ -51,8 +75,8 @@ export function AgreementPaper({
       <section className="mt-10 rounded-[4px] bg-[#F5F4F0] p-4">
         <p className="text-[14px] font-medium text-[#37352F]">✍️ Imzolar</p>
         <div className="mt-4 grid gap-6 sm:grid-cols-2">
-          {agreement.parties.map((party) => (
-            <SignatureBlock key={`${party.role}-${party.name}`} party={party} onSign={onSign} />
+          {parties.map((party) => (
+            <SignatureBlock key={`${party.letter}-${party.name}`} party={party} onSign={onSign} />
           ))}
         </div>
       </section>
@@ -91,20 +115,20 @@ function SignatureBlock({
   party,
   onSign,
 }: {
-  party: Party;
+  party: LabeledParty;
   onSign?: (partyName: string) => void;
 }) {
   const signed = Boolean(party.signedAt);
 
   return (
     <div>
-      <p className="text-[13px] text-[#787774]">{party.role}</p>
+      <p className="text-[13px] text-[#787774]">Tomon {party.letter}</p>
       {signed ? (
         <p className="font-signature mt-2 text-[28px] leading-none text-[#111]">{party.name}</p>
       ) : (
         <p className="mt-2 text-[14px] text-[#ACABA8]">Imzo kutilmoqda</p>
       )}
-      <p className="mt-2 text-[14px] text-[#37352F]">{party.name}</p>
+      <p className="mt-2 text-[14px] text-[#37352F]">{party.signedAs}</p>
       {signed ? <p className="text-[13px] text-[#ACABA8]">{party.signedAt}</p> : null}
       {!signed && onSign ? (
         <Button variant="secondary" onClick={() => onSign(party.name)} className="mt-3">

@@ -8,6 +8,7 @@ import { ProgressBar } from "@/components/progress-bar";
 import { initialsOf } from "@/lib/chat-helpers";
 import type { Deal } from "@/lib/deals";
 import { formatMoney, poolProgress, type PoolRequest } from "@/lib/pool-qarz";
+import { labeledParties } from "@/lib/roles";
 
 /** AI generated agreement, shown as a wide white card with a gold edge. */
 export function AgreementCard({
@@ -98,7 +99,12 @@ export function SignatureCard({
 }) {
   const agreement = deal.agreement;
   if (!agreement) return null;
-  const next = agreement.parties.find((p) => !p.signedAt);
+  const parties = labeledParties({
+    createdBy: deal.createdBy,
+    initiatorRole: deal.initiatorRole,
+    parties: agreement.parties,
+  });
+  const next = parties.find((p) => !p.signedAt);
 
   return (
     <Bubble id={id} side="them" name="Ahd AI" nameColor="#8A6B2E" time={time} wide>
@@ -110,12 +116,12 @@ export function SignatureCard({
           <p className="text-[15px] font-semibold">{next ? "Imzo kutilmoqda" : "Barcha imzolar qo'yildi"}</p>
         </div>
         <ul className="mt-2 space-y-2">
-          {agreement.parties.map((party) => (
-            <li key={`${party.role}-${party.name}`} className="flex items-center gap-2.5">
+          {parties.map((party) => (
+            <li key={`${party.letter}-${party.name}`} className="flex items-center gap-2.5">
               <Avatar initials={initialsOf(party.name)} size="lg" />
               <span className="min-w-0 flex-1">
-                <span className="block truncate text-[13.5px] font-medium">{party.name}</span>
-                <span className="block text-[12px] text-ink2">{party.role}</span>
+                <span className="block truncate text-[13.5px] font-medium">{party.signedAs}</span>
+                <span className="block text-[12px] text-ink2">Tomon {party.letter}</span>
               </span>
               {party.signedAt ? (
                 <span className="text-right text-[12px] font-medium text-[#5A6B38]">

@@ -18,7 +18,7 @@ DO NOT write 'Muhammad ta'kidladi' or similar.
 Generate a clean formal contract with these sections:
 
 1. TOMONLAR
-Extract party names from the conversation.
+List each party on its own line as "Tomon A — {role}: {name}" using the provided party roles (Mijoz / Ijrochi, or Qarz beruvchi / Qarz oluvchi). Do not invent names or roles.
 
 2. SHARTNOMA PREDMETI
 What service/work was agreed (1-2 sentences)

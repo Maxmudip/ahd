@@ -73,6 +73,7 @@ export function Bubble({
   side,
   name,
   nameColor,
+  role,
   time,
   wide = false,
   accent = false,
@@ -82,6 +83,8 @@ export function Bubble({
   side: "me" | "them";
   name?: string;
   nameColor?: string;
+  /** Incoming only: shown under the sender name as "Name · Role". */
+  role?: string;
   time?: string;
   wide?: boolean;
   accent?: boolean;
@@ -105,9 +108,12 @@ export function Bubble({
         } ${fresh ? `bubble-in ${own ? "origin-own" : "origin-them"}` : ""}`}
       >
         {!own && name ? (
-          <p className="mb-0.5 text-[12.5px] font-semibold" style={{ color: nameColor }}>
-            {name}
-          </p>
+          <div className="mb-0.5">
+            <p className="text-[12.5px] font-semibold" style={{ color: nameColor }}>
+              {name}
+            </p>
+            {role ? <p className="text-[11px] leading-tight text-ink2">{`${name} · ${role}`}</p> : null}
+          </div>
         ) : null}
         {children}
         <div className="mt-0.5 flex items-center justify-end gap-1 text-[11px]">
@@ -179,6 +185,7 @@ export function ChatHeader({
   avatar,
   title,
   subtitle,
+  extra,
   center,
   actions,
 }: {
@@ -186,23 +193,44 @@ export function ChatHeader({
   avatar: ReactNode;
   title: string;
   subtitle?: ReactNode;
+  /** Second row under the title (roles, etc.). */
+  extra?: ReactNode;
   center?: ReactNode;
   actions: ReactNode;
 }) {
   const { goBack } = useApp();
   return (
-    <header className="flex h-[60px] w-full min-w-0 shrink-0 items-center gap-1.5 border-b border-line bg-panel px-1.5 md:gap-2 md:px-4">
-      <IconButton label="Orqaga" onClick={() => goBack(back)} className="md:hidden">
-        <ArrowLeft size={20} />
-      </IconButton>
-      {avatar}
-      <div className="min-w-0 flex-1 lg:max-w-[30%] lg:flex-none">
-        <h1 className="truncate text-[15px] font-semibold text-ink">{title}</h1>
-        {subtitle ? <p className="truncate text-[12.5px] text-ink2">{subtitle}</p> : null}
+    <header className="w-full min-w-0 shrink-0 border-b border-line bg-panel">
+      <div className="flex h-[60px] items-center gap-1.5 px-1.5 md:gap-2 md:px-4">
+        <IconButton label="Orqaga" onClick={() => goBack(back)} className="md:hidden">
+          <ArrowLeft size={20} />
+        </IconButton>
+        {avatar}
+        <div className="min-w-0 flex-1 lg:max-w-[30%] lg:flex-none">
+          <h1 className="truncate text-[15px] font-semibold text-ink">{title}</h1>
+          {subtitle ? <p className="truncate text-[12.5px] text-ink2">{subtitle}</p> : null}
+        </div>
+        <div className="hidden min-w-0 flex-1 items-center justify-center gap-2 lg:flex">{center}</div>
+        <div className="ml-auto flex items-center lg:ml-0">{actions}</div>
       </div>
-      <div className="hidden min-w-0 flex-1 items-center justify-center gap-2 lg:flex">{center}</div>
-      <div className="ml-auto flex items-center lg:ml-0">{actions}</div>
+      {extra ? <div className="flex flex-wrap items-center gap-1.5 px-3 pb-2 md:px-4">{extra}</div> : null}
     </header>
+  );
+}
+
+export function RolePills({ items }: { items: string[] }) {
+  if (!items.length) return null;
+  return (
+    <>
+      {items.map((item) => (
+        <span
+          key={item}
+          className="inline-flex max-w-full items-center truncate rounded-full bg-wash px-2 py-0.5 text-[12px] text-ink2"
+        >
+          {item}
+        </span>
+      ))}
+    </>
   );
 }
 

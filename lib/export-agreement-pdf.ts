@@ -1,6 +1,16 @@
-import type { AgreementDocument } from "@/lib/deals";
+import type { AgreementDocument, Deal } from "@/lib/deals";
+import { labeledParties, type DealRoleSource } from "@/lib/roles";
 
-export async function downloadAgreementPdf(agreement: AgreementDocument) {
+export async function downloadAgreementPdf(
+  agreement: AgreementDocument,
+  deal?: Pick<Deal, "createdBy" | "initiatorRole">,
+) {
+  const source: DealRoleSource = {
+    createdBy: deal?.createdBy,
+    initiatorRole: deal?.initiatorRole,
+    parties: agreement.parties,
+  };
+  const parties = labeledParties(source);
   const { jsPDF } = await import("jspdf");
   const pdf = new jsPDF({ unit: "mm", format: "a4" });
   const pageW = 210;
@@ -60,12 +70,12 @@ export async function downloadAgreementPdf(agreement: AgreementDocument) {
   pdf.rect(innerL, y, width, rowH);
   pdf.line(innerL + colW, y, innerL + colW, y + rowH);
 
-  agreement.parties.slice(0, 2).forEach((party, i) => {
+  parties.slice(0, 2).forEach((party, i) => {
     const x = innerL + 4 + i * colW;
     pdf.setFont("times", "normal");
     pdf.setFontSize(8);
     pdf.setTextColor(90, 90, 90);
-    pdf.text(party.role.toUpperCase(), x, y + 5.5);
+    pdf.text(`TOMON ${party.letter} — ${party.role.label.toUpperCase()}`, x, y + 5.5);
     pdf.setFont("times", "bold");
     pdf.setFontSize(11);
     pdf.setTextColor(17, 17, 17);
@@ -74,8 +84,8 @@ export async function downloadAgreementPdf(agreement: AgreementDocument) {
   y += rowH + 10;
 
   agreement.clauses
-    // The built-in template's "Tomonlar" clause is replaced by the parties block above; AI clauses are kept.
-    .filter((c) => !(c.number === "1" && c.title === "Tomonlar" && c.body.startsWith("Ushbu shartnoma")))
+    // Structured Tomonlar block above replaces any "1. Tomonlar" clause.
+    .filter((c) => !/^tomonlar$/i.test(c.title.trim()))
     .forEach((clause) => {
       const heading = clause.title ? `${clause.number}. ${clause.title}` : `${clause.number}.`;
       const body = pdf.splitTextToSize(clause.body, width);
@@ -115,12 +125,12 @@ export async function downloadAgreementPdf(agreement: AgreementDocument) {
   y += 8;
 
   const sigW = (width - 8) / 2;
-  agreement.parties.slice(0, 2).forEach((party, i) => {
+  parties.slice(0, 2).forEach((party, i) => {
     const x = innerL + i * (sigW + 8);
     pdf.setFont("times", "normal");
     pdf.setFontSize(8);
     pdf.setTextColor(90, 90, 90);
-    pdf.text(party.role, x, y);
+    pdf.text(party.signedAs, x, y);
     pdf.setDrawColor(17, 17, 17);
     pdf.setLineDashPattern([1.2, 1.2], 0);
     pdf.line(x, y + 14, x + sigW, y + 14);

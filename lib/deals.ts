@@ -1,3 +1,5 @@
+import { labeledParties } from "@/lib/roles";
+
 export type DealStatus = "draft" | "pending" | "rejected" | "discussion" | "signing" | "completed";
 
 export type InitiatorRole = "mijoz" | "ijrochi" | "qarz_beruvchi" | "qarz_oluvchi";
@@ -140,7 +142,7 @@ export function buildAgreementFromDeal(deal: Deal): AgreementDocument {
       {
         number: "1",
         title: "Tomonlar",
-        body: `Ushbu shartnoma ${parties.map((p) => `${p.role} ${p.name}`).join(" va ")} o'rtasida tuziladi. Tomonlar o'z huquqiy vakolatlarini tasdiqlaydilar.`,
+        body: labeledParties({ ...deal, parties }).map((p) => p.tomonLine).join("\n"),
       },
       {
         number: "2",

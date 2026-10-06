@@ -19,6 +19,7 @@ import {
   IconButton,
   InfoDrawer,
   MenuButton,
+  RolePills,
   SystemMessage,
   TypingBubble,
   type PillItem,
@@ -36,6 +37,7 @@ import {
   nowTime,
   type ChatMessage,
 } from "@/lib/deals";
+import { dealRolePills, labeledParties, partyRole, roleForAuthor } from "@/lib/roles";
 
 type Busy = null | "generate" | "analyze";
 
@@ -188,7 +190,7 @@ export default function DealChatPage() {
         body: JSON.stringify({
           messages: chat,
           title: deal.title,
-          parties: deal.parties.map((p) => ({ name: p.name, role: p.role })),
+          parties: labeledParties(deal).map((p) => ({ name: p.name, role: p.role.label })),
         }),
       });
       const data = (await response.json().catch(() => null)) as { agreement?: string; error?: string } | null;
@@ -362,6 +364,7 @@ export default function DealChatPage() {
           avatar={<Avatar initials={initialsOf(deal.counterparty)} size="hd" />}
           title={deal.title}
           subtitle={deal.counterparty}
+          extra={<RolePills items={dealRolePills(deal, me.id, me.name)} />}
           center={<KindBadge kind={kind} />}
           actions={null}
         />
@@ -414,6 +417,7 @@ export default function DealChatPage() {
             </span>
           </>
         }
+        extra={<RolePills items={dealRolePills(deal, me.id, me.name)} />}
         center={
           <>
             <KindBadge kind={kind} />
@@ -434,7 +438,7 @@ export default function DealChatPage() {
                   label: "PDF yuklash",
                   icon: <Download size={16} />,
                   disabled: !deal.agreement,
-                  onClick: () => deal.agreement && void downloadAgreementPdf(deal.agreement),
+                  onClick: () => deal.agreement && void downloadAgreementPdf(deal.agreement, deal),
                 },
                 {
                   label: "AI kelishuv yaratish",
@@ -502,7 +506,7 @@ export default function DealChatPage() {
           <div className="p-4">
             <div className="mb-3 flex items-center justify-between gap-2">
               <StatusBadge status={deal.status} />
-              <Button variant="secondary" onClick={() => void downloadAgreementPdf(deal.agreement!)} disabled={busy === "generate"}>
+              <Button variant="secondary" onClick={() => void downloadAgreementPdf(deal.agreement!, deal)} disabled={busy === "generate"}>
                 <Download size={14} className="mr-1.5" />
                 PDF yuklash
               </Button>
@@ -522,7 +526,7 @@ export default function DealChatPage() {
               </div>
             ) : (
               <div data-theme="light" className="rounded-[10px] bg-white p-5 text-[#111] shadow-[0_1px_3px_rgba(0,0,0,0.12)]">
-                <AgreementPaper agreement={deal.agreement} status={deal.status} onSign={sign} />
+                <AgreementPaper agreement={deal.agreement} deal={deal} status={deal.status} onSign={sign} />
               </div>
             )}
             {genError && busy !== "generate" ? (
@@ -557,22 +561,28 @@ export default function DealChatPage() {
 
       <InfoDrawer open={drawer === "people"} title="Ishtirokchilar" onClose={() => setDrawer(null)}>
         <ul className="py-2">
-          {deal.parties.map((party) => (
-            <li key={`${party.role}-${party.name}`} className="flex min-h-12 items-center gap-3 px-4 py-2">
-              <Avatar initials={initialsOf(party.name)} size="xl" />
-              <span className="min-w-0 flex-1">
-                <span className="block truncate text-[15px] font-medium text-ink">{party.name}</span>
-                <span className="block text-[13px] text-ink2">{party.role}</span>
-              </span>
-              {party.signedAt ? (
-                <span className="text-[12.5px] font-medium text-[#2E9E5B]">✓ {party.signedAt}</span>
-              ) : (
-                <span className="rounded-full bg-[#F6EFD9] px-2 py-0.5 text-[12px] font-medium text-[#8A6B2E]">
-                  Kutilmoqda
+          {deal.parties.map((party, index) => {
+            const role = partyRole(deal, party, index);
+            return (
+              <li key={`${party.role}-${party.name}`} className="flex min-h-12 items-center gap-3 px-4 py-2">
+                <Avatar initials={initialsOf(party.name)} size="xl" />
+                <span className="min-w-0 flex-1">
+                  <span className="block truncate text-[15px] font-medium text-ink">{party.name}</span>
+                  <span className="block text-[13px] text-ink2">
+                    {role.emoji ? `${role.emoji} ` : ""}
+                    {role.label}
+                  </span>
                 </span>
-              )}
-            </li>
-          ))}
+                {party.signedAt ? (
+                  <span className="text-[12.5px] font-medium text-[#2E9E5B]">✓ {party.signedAt}</span>
+                ) : (
+                  <span className="rounded-full bg-[#F6EFD9] px-2 py-0.5 text-[12px] font-medium text-[#8A6B2E]">
+                    Kutilmoqda
+                  </span>
+                )}
+              </li>
+            );
+          })}
           <li className="flex min-h-12 items-center gap-3 px-4 py-2">
             <span className="flex h-12 w-12 items-center justify-center rounded-full bg-[#F6EFD9] text-[22px]">🤖</span>
             <span className="min-w-0 flex-1">
@@ -605,9 +615,10 @@ export default function DealChatPage() {
       return <SignatureCard id={message.id} deal={deal} time={message.time} onSign={signNext} />;
     }
     const side = message.side === "me" ? "me" : "them";
+    const role = message.kind === "ai" ? undefined : roleForAuthor(deal, message.author)?.label;
     if (message.kind === "file") {
       return (
-        <Bubble id={message.id} side={side} name={message.author} nameColor={nameColor(message.author)} time={message.time}>
+        <Bubble id={message.id} side={side} name={message.author} nameColor={nameColor(message.author)} role={role} time={message.time}>
           <div className="flex items-center gap-2.5 py-1">
             <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-[8px] bg-white/15 text-[#C9A84C]">
               <Paperclip size={18} />
@@ -623,6 +634,7 @@ export default function DealChatPage() {
         side={side}
         name={message.author}
         nameColor={message.kind === "ai" ? "#8A6B2E" : nameColor(message.author)}
+        role={role}
         time={message.time}
       >
         <p className="text-[14.5px] leading-[1.4] break-anywhere whitespace-pre-wrap">
