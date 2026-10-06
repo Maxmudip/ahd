@@ -9,11 +9,14 @@ import {
   type Deal,
   type DealInvitation,
   type DealKind,
+  type CompletionReason,
+  type CompletionStatus,
   type DealStatus,
   type InitiatorRole,
   type InviteStatus,
   type MessageKind,
   type Party,
+  type RatingReview,
 } from "@/lib/deals";
 import {
   formatMoney,
@@ -32,7 +35,15 @@ import { clock, dayLabel, daysUntil, relativeLabel, stampLabel } from "@/lib/tim
  * Database rows (see supabase/migrations/*.sql)
  * ----------------------------------------------------------------------------------------- */
 
-type UserRow = { id: string; full_name: string; email: string | null; phone: string | null };
+type UserRow = {
+  id: string;
+  full_name: string;
+  email: string | null;
+  phone: string | null;
+  avg_rating?: number | string | null;
+  total_deals?: number | null;
+  total_ratings?: number | null;
+};
 type DealRoomRow = {
   id: string;
   title: string;
@@ -43,6 +54,20 @@ type DealRoomRow = {
   created_at: string;
   updated_at: string;
   initiator_role?: InitiatorRole | null;
+  completion_reason?: CompletionReason | null;
+  completion_requested_by?: string | null;
+  completion_status?: CompletionStatus | null;
+  completed_at?: string | null;
+  disputed_at?: string | null;
+};
+type RatingRow = {
+  id: string;
+  deal_room_id: string;
+  rater_id: string;
+  rated_id: string;
+  rating: number;
+  comment: string | null;
+  created_at: string;
 };
 type InvitationRow = {
   id: string;
@@ -67,7 +92,7 @@ export type MessageRow = {
   deal_id: string;
   sender_id: string | null;
   author_name: string;
-  kind: "text" | "ai" | "file" | "agreement" | "signature" | "system";
+  kind: "text" | "ai" | "file" | "agreement" | "signature" | "system" | "completion" | "mojaro";
   body: string;
   created_at: string;
 };
@@ -109,7 +134,13 @@ type ContributionRow = {
 
 export type SessionUser = { id: string; name: string; email: string; phone: string };
 
-export type AppData = { deals: Deal[]; pools: PoolRequest[]; contacts: Person[] };
+export type AppData = {
+  deals: Deal[];
+  pools: PoolRequest[];
+  contacts: Person[];
+  reviews: RatingReview[];
+  meStats: { avgRating: number | null; totalDeals: number; totalRatings: number };
+};
 
 /* -------------------------------------------------------------------------------------------
  * Errors
@@ -127,8 +158,14 @@ export function explainError(error: unknown): string {
   if (e.code === "PGRST204" || text.includes("initiator_role")) {
     return "deal_rooms.initiator_role ustuni yo'q. Shu SQL faylini (deal_invitations) ishga tushiring.";
   }
+  if (e.code === "PGRST205" || e.code === "42P01" || text.includes("ratings")) {
+    return "ratings jadvali yo'q. Supabase SQL Editor'da supabase/migrations/20261006010000_deal_close_ratings.sql ni ishga tushiring.";
+  }
+  if (e.code === "23514" && text.includes("messages_kind_check")) {
+    return "messages.kind hali 'completion'/'mojaro' qabul qilmaydi. deal_close_ratings SQL ni ishga tushiring.";
+  }
   if (e.code === "23514" || text.includes("deal_rooms_status_check")) {
-    return "deal_rooms.status hali 'pending' qiymatini qabul qilmaydi. deal_invitations SQL ni ishga tushiring.";
+    return "deal_rooms.status yangi qiymatlarni qabul qilmaydi. deal_invitations va deal_close_ratings SQL ni ishga tushiring.";
   }
   if (e.code === "42501" || text.includes("row-level security")) {
     return e.message?.includes("imzoni") ? e.message : "Bu amal uchun ruxsat yo'q (RLS).";
@@ -155,6 +192,9 @@ export function personFromUser(user: UserRow): Person {
     phone: user.phone || user.email || "",
     email: user.email ?? "",
     initials: initialsOf(name),
+    avgRating: user.avg_rating == null || user.avg_rating === "" ? null : Number(user.avg_rating),
+    totalDeals: user.total_deals ?? 0,
+    totalRatings: user.total_ratings ?? 0,
   };
 }
 
@@ -185,7 +225,12 @@ function toDateOnly(date: Date) {
 export function mapMessage(row: MessageRow, meId: string, now = new Date()): ChatMessage {
   const at = new Date(row.created_at);
   const kind: MessageKind | undefined =
-    row.kind === "ai" || row.kind === "file" || row.kind === "agreement" || row.kind === "signature"
+    row.kind === "ai" ||
+    row.kind === "file" ||
+    row.kind === "agreement" ||
+    row.kind === "signature" ||
+    row.kind === "completion" ||
+    row.kind === "mojaro"
       ? row.kind
       : undefined;
   return {
@@ -239,6 +284,7 @@ function buildDeal(
   meId: string,
   meEmail: string,
   now: Date,
+  ratedByMe: boolean,
 ): Deal {
   const parties = [...participants].sort((a, b) => a.position - b.position).map(mapParty);
   const others = parties.filter((p) => p.userId !== meId).map((p) => p.name);
@@ -261,6 +307,12 @@ function buildDeal(
     initiatorRole: room.initiator_role ?? null,
     invitation: invitation ? mapInvitation(invitation) : null,
     incomingInvite: incoming,
+    completionReason: room.completion_reason ?? null,
+    completionRequestedBy: room.completion_requested_by ?? null,
+    completionStatus: room.completion_status ?? null,
+    completedAt: room.completed_at ? formatUzDate(new Date(room.completed_at)) : null,
+    disputedAt: room.disputed_at ? formatUzDate(new Date(room.disputed_at)) : null,
+    ratedByMe,
   };
 }
 
@@ -352,8 +404,8 @@ function groupBy<T>(rows: T[], key: (row: T) => string) {
 
 /** Everything the signed-in user can see (Row Level Security does the filtering). */
 export async function fetchAppData(sb: SupabaseClient, me: SessionUser): Promise<AppData> {
-  const [users, rooms, participants, messages, agreements, pools, contributions, invitations] = await Promise.all([
-    sb.from("users").select("id, full_name, email, phone").then((r) => must<UserRow[]>(r)),
+  const [users, rooms, participants, messages, agreements, pools, contributions, invitations, ratings] = await Promise.all([
+    sb.from("users").select("*").then((r) => must<UserRow[]>(r)),
     sb.from("deal_rooms").select("*").order("updated_at", { ascending: false }).then((r) => must<DealRoomRow[]>(r)),
     sb.from("deal_participants").select("*").then((r) => must<ParticipantRow[]>(r)),
     fetchAllRows<MessageRow>((from, to) =>
@@ -372,6 +424,13 @@ export async function fetchAppData(sb: SupabaseClient, me: SessionUser): Promise
       }
       return (r.data ?? []) as InvitationRow[];
     }),
+    sb.from("ratings").select("*").order("created_at", { ascending: false }).then((r) => {
+      if (r.error) {
+        console.warn("[fetchAppData] ratings:", r.error.code, r.error.message);
+        return [] as RatingRow[];
+      }
+      return (r.data ?? []) as RatingRow[];
+    }),
   ]);
 
   const now = new Date();
@@ -388,6 +447,10 @@ export async function fetchAppData(sb: SupabaseClient, me: SessionUser): Promise
     if (!prev || inv.created_at > prev.created_at) inviteByDeal.set(inv.deal_room_id, inv);
   }
 
+  const ratedDeals = new Set(ratings.filter((r) => r.rater_id === me.id).map((r) => r.deal_room_id));
+  const meRow = users.find((u) => u.id === me.id);
+  const mePerson = meRow ? personFromUser(meRow) : null;
+
   return {
     deals: rooms.map((room) =>
       buildDeal(
@@ -399,10 +462,31 @@ export async function fetchAppData(sb: SupabaseClient, me: SessionUser): Promise
         me.id,
         me.email,
         now,
+        ratedDeals.has(room.id),
       ),
     ),
     pools: pools.map((row) => buildPool(row, contribByPool.get(row.id) ?? [], person, me.id, now)),
     contacts: users.filter((u) => u.id !== me.id).map(personFromUser).sort((a, b) => a.name.localeCompare(b.name)),
+    reviews: ratings
+      .filter((r) => r.rated_id === me.id)
+      .map((r) => {
+        const rater = person(r.rater_id);
+        return {
+          id: r.id,
+          dealId: r.deal_room_id,
+          raterId: r.rater_id,
+          raterName: rater.name,
+          rating: r.rating,
+          comment: r.comment ?? "",
+          createdAt: r.created_at,
+          dateLabel: formatUzDate(new Date(r.created_at)),
+        };
+      }),
+    meStats: {
+      avgRating: mePerson?.avgRating ?? null,
+      totalDeals: mePerson?.totalDeals ?? 0,
+      totalRatings: mePerson?.totalRatings ?? 0,
+    },
   };
 }
 
@@ -591,8 +675,27 @@ export async function saveDealChange(sb: SupabaseClient, me: SessionUser, prev: 
     }
   }
 
-  if (next.status !== prev.status) {
-    check(await sb.from("deal_rooms").update({ status: next.status }).eq("id", next.id));
+  const closeChanged =
+    next.status !== prev.status ||
+    next.completionReason !== prev.completionReason ||
+    next.completionRequestedBy !== prev.completionRequestedBy ||
+    next.completionStatus !== prev.completionStatus;
+  if (closeChanged) {
+    const room = await sb
+      .from("deal_rooms")
+      .update({
+        status: next.status,
+        completion_reason: next.completionReason ?? null,
+        completion_requested_by: next.completionRequestedBy ?? null,
+        completion_status: next.completionStatus ?? null,
+        completed_at: next.status === "completed" && prev.status !== "completed" ? new Date().toISOString() : undefined,
+        disputed_at: next.status === "disputed" && prev.status !== "disputed" ? new Date().toISOString() : undefined,
+      })
+      .eq("id", next.id);
+    if (room.error) {
+      console.warn("[saveDealChange] room close fields failed, status only:", room.error.message);
+      check(await sb.from("deal_rooms").update({ status: next.status }).eq("id", next.id));
+    }
   }
 
   if (added.length) {
@@ -621,6 +724,22 @@ export async function insertPool(sb: SupabaseClient, me: SessionUser, pool: Pool
       repayments: pool.repayments,
       card_last4: pool.cardLast4,
       invited_ids: pool.invited.map((p) => p.id),
+    }),
+  );
+}
+
+export async function insertRating(
+  sb: SupabaseClient,
+  me: SessionUser,
+  input: { dealId: string; ratedId: string; rating: number; comment: string },
+) {
+  check(
+    await sb.from("ratings").insert({
+      deal_room_id: input.dealId,
+      rater_id: me.id,
+      rated_id: input.ratedId,
+      rating: input.rating,
+      comment: input.comment.trim(),
     }),
   );
 }

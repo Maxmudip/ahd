@@ -450,3 +450,22 @@ textarea.field {
   overflow-wrap: anywhere;
   word-break: break-word;
 }
+
+@keyframes check-pop {
+  0% {
+    transform: scale(0.4);
+    opacity: 0;
+  }
+  60% {
+    transform: scale(1.12);
+  }
+  100% {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+
+.check-pop {
+  display: inline-block;
+  animation: check-pop 0.45s cubic-bezier(0.32, 0.72, 0, 1) both;
+}

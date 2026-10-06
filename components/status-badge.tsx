@@ -7,6 +7,7 @@ const styles: Record<DealStatus, string> = {
   draft: "bg-[#F5F4F0] text-[#6E6A62]",
   pending: "bg-[#F6EFD9] text-[#8A6B2E]",
   rejected: "bg-[#FDEBEC] text-[#C4554D]",
+  disputed: "bg-[#FDEBEC] text-[#C4554D]",
 };
 
 export function StatusBadge({ status }: { status: DealStatus }) {

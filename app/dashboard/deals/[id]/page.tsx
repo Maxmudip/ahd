@@ -25,6 +25,14 @@ import {
   TypingBubble,
   type PillItem,
 } from "@/components/chat-ui";
+import {
+  CloseDealSheet,
+  CompletedSheet,
+  CompletionCard,
+  MojaroBubble,
+  RatingBadge,
+  RatingSheet,
+} from "@/components/deal-close";
 import { DealGate } from "@/components/deal-invite";
 import { KindBadge } from "@/components/kind-badge";
 import { StatusBadge } from "@/components/status-badge";
@@ -33,10 +41,12 @@ import { buildAgreementFromAiText } from "@/lib/agreement-text";
 import { downloadAgreementPdf } from "@/lib/export-agreement-pdf";
 import {
   STATUS_LABEL,
+  encodeCompletion,
   formatUzDate,
   isDealActive,
   nowTime,
   type ChatMessage,
+  type CompletionReason,
 } from "@/lib/deals";
 import { dealRolePills, labeledParties, partyRole, roleForAuthor } from "@/lib/roles";
 
@@ -50,7 +60,7 @@ export default function DealChatPage() {
   const params = useParams<{ id: string }>();
   const id = params.id;
   const router = useRouter();
-  const { me, deals, hydrated, updateDeal, markRead, archived, toggleArchive, respondToInvite, resendInvite } = useApp();
+  const { me, deals, contacts, hydrated, updateDeal, markRead, archived, toggleArchive, respondToInvite, resendInvite, submitRating } = useApp();
   const deal = deals.find((d) => d.id === id) ?? null;
 
   const [draft, setDraft] = useState("");
@@ -59,6 +69,8 @@ export default function DealChatPage() {
   const [drawer, setDrawer] = useState<"doc" | "people" | null>(null);
   const [notice, setNotice] = useState("");
   const [genError, setGenError] = useState("");
+  const [sheet, setSheet] = useState<null | "close" | "success" | "rate">(null);
+  const skippedRate = useRef(false);
   // AI Mediator: live-session tips only — kept out of deal.messages so they are never saved or counted.
   const [tips, setTips] = useState<(MediatorTipData & { dealId: string })[]>([]);
   const [mediating, setMediating] = useState<string | null>(null);
@@ -70,7 +82,14 @@ export default function DealChatPage() {
 
   useEffect(() => {
     markRead(id);
+    skippedRate.current = false;
   }, [id, markRead]);
+
+  useEffect(() => {
+    if (deal?.status === "completed" && !deal.ratedByMe && !skippedRate.current) {
+      setSheet((current) => current ?? "success");
+    }
+  }, [deal?.status, deal?.ratedByMe]);
 
   // Real chat messages only: people's text — no system notices, cards or AI replies.
   const realMessages = useMemo(
@@ -158,10 +177,103 @@ export default function DealChatPage() {
     event.preventDefault();
     const text = draft.trim();
     if (!deal || !text) return;
-    push({ id: freshId(), author: me.name, side: "me", text, time: nowTime(), day: "Bugun" });
+    push({
+      id: freshId(),
+      author: me.name,
+      side: "me",
+      text,
+      time: nowTime(),
+      day: "Bugun",
+      ...(deal.status === "disputed" ? { kind: "mojaro" as const } : null),
+    });
     setDraft("");
     setPlusOpen(false);
     inputRef.current?.focus();
+  }
+
+  function requestClose(reason: CompletionReason) {
+    if (!deal || deal.status === "completed" || deal.completionStatus === "pending") return;
+    const time = nowTime();
+    updateDeal(
+      id,
+      (d) => ({
+        ...d,
+        completionReason: reason,
+        completionRequestedBy: me.id,
+        completionStatus: "pending",
+        messages: [
+          ...d.messages,
+          {
+            id: freshId(),
+            author: me.name,
+            side: "me",
+            kind: "completion",
+            text: encodeCompletion(reason),
+            time,
+            day: "Bugun",
+          },
+        ],
+        updatedAt: `Bugun, ${time}`,
+      }),
+      true,
+    );
+    setSheet(null);
+    flash("Taklif yuborildi.");
+  }
+
+  function respondClose(accept: boolean) {
+    if (!deal || deal.completionStatus !== "pending") return;
+    const time = nowTime();
+    const reason = deal.completionReason;
+    updateDeal(
+      id,
+      (d) => {
+        if (d.completionStatus !== "pending") return d;
+        const nextStatus = accept ? (d.completionReason === "dispute" ? "disputed" : "completed") : d.status;
+        const extra: ChatMessage[] = [];
+        if (accept && nextStatus === "disputed") {
+          extra.push({
+            id: freshId(),
+            author: "Tizim",
+            side: "system",
+            text: "Mojaro holati. Har bir tomon o'z pozitsiyasini bayon qilsin.",
+            time,
+            day: "Bugun",
+          });
+        }
+        if (accept && nextStatus === "completed") {
+          extra.push({
+            id: freshId(),
+            author: "Tizim",
+            side: "system",
+            text: "Kelishuv yakunlandi.",
+            time,
+            day: "Bugun",
+          });
+        }
+        if (!accept) {
+          extra.push({
+            id: freshId(),
+            author: "Tizim",
+            side: "system",
+            text: `${me.name} tugatishni rad etdi.`,
+            time,
+            day: "Bugun",
+          });
+        }
+        return {
+          ...d,
+          status: nextStatus,
+          completionStatus: accept ? "accepted" : "rejected",
+          completedAt: nextStatus === "completed" ? formatUzDate() : d.completedAt,
+          disputedAt: nextStatus === "disputed" ? formatUzDate() : d.disputedAt,
+          messages: [...d.messages, ...extra],
+          updatedAt: `Bugun, ${time}`,
+        };
+      },
+      true,
+    );
+    if (accept && reason !== "dispute") setSheet("success");
   }
 
   /** `regen`: replace the existing agreement in place — the panel is neither closed nor force-opened. */
@@ -348,6 +460,11 @@ export default function DealChatPage() {
   const isArchived = archived.includes(deal.id);
   const kind = deal.kind ?? "kelishuv";
   const chatOpen = isDealActive(deal.status) && !deal.incomingInvite;
+  const otherId = deal.parties.find((p) => p.userId && p.userId !== me.id)?.userId ?? null;
+  const otherRating = (otherId && contacts.find((c) => c.id === otherId)?.avgRating) || null;
+  const otherName = deal.parties.find((p) => p.userId === otherId)?.name || deal.counterparty;
+  const lastCloseId = [...deal.messages].reverse().find((m) => m.kind === "completion")?.id;
+  const canClose = deal.status !== "completed" && deal.status !== "pending" && deal.status !== "rejected" && deal.completionStatus !== "pending";
 
   if (!chatOpen) {
     return (
@@ -404,6 +521,12 @@ export default function DealChatPage() {
         subtitle={
           <>
             {deal.counterparty}
+            {otherRating != null ? (
+              <>
+                {" "}
+                <RatingBadge rating={otherRating} />
+              </>
+            ) : null}
             <span className="lg:hidden">
               {" · "}
               <KindBadge kind={kind} size="sm" /> · {STATUS_LABEL[deal.status]}
@@ -414,7 +537,13 @@ export default function DealChatPage() {
         center={
           <>
             <KindBadge kind={kind} />
-            <StatusBadge status={deal.status} />
+            {deal.status === "disputed" ? (
+              <span className="inline-flex items-center rounded-[3px] bg-[#FDEBEC] px-1.5 py-0.5 text-[12px] font-medium text-[#C4554D]">
+                ⚠️ Mojaro
+              </span>
+            ) : (
+              <StatusBadge status={deal.status} />
+            )}
           </>
         }
         actions={
@@ -440,6 +569,14 @@ export default function DealChatPage() {
                   onClick: () => void generate(),
                 },
                 {
+                  label: "Kelishuvni tugatish",
+                  disabled: !canClose,
+                  onClick: () => setSheet("close"),
+                },
+                ...(deal.status === "completed" && !deal.ratedByMe
+                  ? [{ label: "Baholash", onClick: () => setSheet("rate") }]
+                  : []),
+                {
                   label: isArchived ? "Arxivdan chiqarish" : "Arxivlash",
                   icon: <Archive size={16} />,
                   onClick: () => {
@@ -463,7 +600,7 @@ export default function DealChatPage() {
               value={draft}
               onChange={setDraft}
               onSubmit={send}
-              placeholder="Xabar yozing..."
+              placeholder={deal.status === "disputed" ? "Pozitsiyangizni yozing..." : "Xabar yozing..."}
               inputRef={inputRef}
               notice={notice}
               plus={{ open: plusOpen, onToggle: () => setPlusOpen((v) => !v), items: plusItems }}
@@ -588,6 +725,28 @@ export default function DealChatPage() {
           </li>
         </ul>
       </InfoDrawer>
+
+      <CloseDealSheet open={sheet === "close"} onClose={() => setSheet(null)} onPick={requestClose} />
+      <CompletedSheet
+        open={sheet === "success"}
+        deal={deal}
+        onRate={() => setSheet("rate")}
+        onHome={() => router.push("/dashboard")}
+        onClose={() => setSheet(null)}
+      />
+      <RatingSheet
+        open={sheet === "rate"}
+        name={otherName}
+        onSubmit={async (rating, comment) => {
+          if (!otherId) return;
+          await submitRating(deal.id, otherId, rating, comment);
+          setSheet(null);
+        }}
+        onSkip={() => {
+          skippedRate.current = true;
+          setSheet(null);
+        }}
+      />
     </div>
   );
 
@@ -609,6 +768,24 @@ export default function DealChatPage() {
     }
     if (message.kind === "signature") {
       return <SignatureCard id={message.id} deal={deal} time={message.time} onSign={signNext} />;
+    }
+    if (message.kind === "completion") {
+      return (
+        <CompletionCard
+          id={message.id}
+          author={message.author}
+          text={message.text}
+          mine={message.side === "me"}
+          pending={message.id === lastCloseId && deal.completionStatus === "pending"}
+          canRespond={deal.completionRequestedBy !== me.id}
+          time={message.time}
+          onAccept={() => respondClose(true)}
+          onReject={() => respondClose(false)}
+        />
+      );
+    }
+    if (message.kind === "mojaro") {
+      return <MojaroBubble name={message.author} text={message.text} time={message.time} own={message.side === "me"} />;
     }
     const side = message.side === "me" ? "me" : "them";
     const role = message.kind === "ai" ? undefined : roleForAuthor(deal, message.author)?.label;

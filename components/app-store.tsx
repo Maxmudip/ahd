@@ -17,6 +17,7 @@ import {
   fetchContacts,
   insertDeal,
   insertPool,
+  insertRating,
   mapMessage,
   personFromSession,
   resendInvitation,
@@ -26,7 +27,7 @@ import {
   type MessageRow,
   type SessionUser,
 } from "@/lib/data";
-import type { Deal } from "@/lib/deals";
+import type { Deal, RatingReview } from "@/lib/deals";
 import type { Person, PoolRequest } from "@/lib/pool-qarz";
 import { createClient } from "@/lib/supabase";
 import { stampLabel } from "@/lib/time-labels";
@@ -87,6 +88,8 @@ type AppStore = {
   incomingInvites: Deal[];
   respondToInvite: (invitationId: string, accept: boolean) => Promise<void>;
   resendInvite: (dealId: string, email: string) => Promise<void>;
+  reviews: RatingReview[];
+  submitRating: (dealId: string, ratedId: string, rating: number, comment: string) => Promise<void>;
 };
 
 const AppContext = createContext<AppStore | null>(null);
@@ -111,7 +114,9 @@ export function AppProvider({ user, children }: { user: SessionUser; children: R
     () => ({ id: user.id, name: user.name, email: user.email, phone: user.phone }),
     [user.id, user.name, user.email, user.phone],
   );
-  const me = useMemo(() => personFromSession(session), [session]);
+  const [meStats, setMeStats] = useState({ avgRating: null as number | null, totalDeals: 0, totalRatings: 0 });
+  const [reviews, setReviews] = useState<RatingReview[]>([]);
+  const me = useMemo(() => ({ ...personFromSession(session), ...meStats }), [session, meStats]);
 
   const [deals, setDeals] = useState<Deal[]>([]);
   const [pools, setPools] = useState<PoolRequest[]>([]);
@@ -169,6 +174,8 @@ export function AppProvider({ user, children }: { user: SessionUser; children: R
         commitDeals(data.deals);
         commitPools(data.pools);
         setContacts(data.contacts);
+        setReviews(data.reviews);
+        setMeStats(data.meStats);
         setSyncError("");
         break;
       }
@@ -251,6 +258,7 @@ export function AppProvider({ user, children }: { user: SessionUser; children: R
       .on("postgres_changes", { event: "*", schema: "public", table: "deal_participants" }, scheduleRefresh)
       .on("postgres_changes", { event: "*", schema: "public", table: "agreements" }, scheduleRefresh)
       .on("postgres_changes", { event: "*", schema: "public", table: "deal_invitations" }, scheduleRefresh)
+      .on("postgres_changes", { event: "*", schema: "public", table: "ratings" }, scheduleRefresh)
       .on("postgres_changes", { event: "*", schema: "public", table: "pool_qarz_requests" }, scheduleRefresh)
       .on("postgres_changes", { event: "INSERT", schema: "public", table: "pool_qarz_contributions" }, (payload) => {
         const row = payload.new as { request_id: string; contributor_id: string };
@@ -415,6 +423,15 @@ export function AppProvider({ user, children }: { user: SessionUser; children: R
     [supabase, load],
   );
 
+  const submitRating = useCallback(
+    async (dealId: string, ratedId: string, rating: number, comment: string) => {
+      await insertRating(supabase, session, { dealId, ratedId, rating, comment });
+      commitDeals(dealsRef.current.map((d) => (d.id === dealId ? { ...d, ratedByMe: true } : d)));
+      await load();
+    },
+    [supabase, session, commitDeals, load],
+  );
+
   const value = useMemo<AppStore>(
     () => ({
       me,
@@ -447,6 +464,8 @@ export function AppProvider({ user, children }: { user: SessionUser; children: R
       incomingInvites,
       respondToInvite,
       resendInvite,
+      reviews,
+      submitRating,
     }),
     [
       me,
@@ -478,6 +497,8 @@ export function AppProvider({ user, children }: { user: SessionUser; children: R
       incomingInvites,
       respondToInvite,
       resendInvite,
+      reviews,
+      submitRating,
     ],
   );
 

@@ -22,6 +22,9 @@ export type Person = {
   phone: string;
   email?: string;
   initials: string;
+  avgRating?: number | null;
+  totalDeals?: number;
+  totalRatings?: number;
 };
 
 export type Contributor = {

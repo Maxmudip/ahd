@@ -1,6 +1,48 @@
 import { labeledParties } from "@/lib/roles";
 
-export type DealStatus = "draft" | "pending" | "rejected" | "discussion" | "signing" | "completed";
+export type DealStatus = "draft" | "pending" | "rejected" | "discussion" | "signing" | "completed" | "disputed";
+
+export type CompletionReason = "success" | "mutual" | "dispute";
+export type CompletionStatus = "pending" | "accepted" | "rejected";
+
+export const COMPLETION_REASONS: { id: CompletionReason; emoji: string; label: string }[] = [
+  { id: "success", emoji: "✅", label: "Ish muvaffaqiyatli bajarildi" },
+  { id: "mutual", emoji: "🤝", label: "Kelishuv o'zaro kelishilgan holda bekor qilindi" },
+  { id: "dispute", emoji: "⚠️", label: "Mojaro yuzaga keldi" },
+];
+
+export const COMPLETION_LABEL: Record<CompletionReason, string> = {
+  success: "Ish muvaffaqiyatli bajarildi",
+  mutual: "Kelishuv o'zaro kelishilgan holda bekor qilindi",
+  dispute: "Mojaro yuzaga keldi",
+};
+
+export function encodeCompletion(reason: CompletionReason) {
+  return JSON.stringify({ reason, label: COMPLETION_LABEL[reason] });
+}
+
+export function decodeCompletion(text: string): { reason: CompletionReason; label: string } | null {
+  try {
+    const raw = JSON.parse(text) as { reason?: string; label?: string };
+    if (raw.reason === "success" || raw.reason === "mutual" || raw.reason === "dispute") {
+      return { reason: raw.reason, label: raw.label || COMPLETION_LABEL[raw.reason] };
+    }
+  } catch {
+    /* plain text fallback */
+  }
+  return null;
+}
+
+export type RatingReview = {
+  id: string;
+  dealId: string;
+  raterId: string;
+  raterName: string;
+  rating: number;
+  comment: string;
+  createdAt: string;
+  dateLabel: string;
+};
 
 export type InitiatorRole = "mijoz" | "ijrochi" | "qarz_beruvchi" | "qarz_oluvchi";
 
@@ -16,7 +58,7 @@ export type DealInvitation = {
 
 /** Chat is open for both parties. Pending/rejected invitations have no chat. */
 export function isDealActive(status: DealStatus) {
-  return status === "discussion" || status === "signing" || status === "completed";
+  return status === "discussion" || status === "signing" || status === "completed" || status === "disputed";
 }
 
 export type Party = {
@@ -27,7 +69,7 @@ export type Party = {
   userId?: string | null;
 };
 
-export type MessageKind = "agreement" | "signature" | "file" | "ai";
+export type MessageKind = "agreement" | "signature" | "file" | "ai" | "completion" | "mojaro";
 
 export type ChatMessage = {
   id: string;
@@ -79,6 +121,12 @@ export type Deal = {
   invitation?: DealInvitation | null;
   /** True when this row is an incoming invite the signed-in user has not answered yet. */
   incomingInvite?: boolean;
+  completionReason?: CompletionReason | null;
+  completionRequestedBy?: string | null;
+  completionStatus?: CompletionStatus | null;
+  completedAt?: string | null;
+  disputedAt?: string | null;
+  ratedByMe?: boolean;
 };
 
 export const STATUS_LABEL: Record<DealStatus, string> = {
@@ -88,6 +136,7 @@ export const STATUS_LABEL: Record<DealStatus, string> = {
   discussion: "Muhokama",
   signing: "Imzolash",
   completed: "Yakunlangan",
+  disputed: "Mojaro",
 };
 
 const UZ_MONTHS = [

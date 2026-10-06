@@ -8,6 +8,7 @@ import { Avatar, GroupAvatar } from "@/components/avatar";
 import { useApp, type ListTab } from "@/components/app-store";
 import { EmptyNote, IconButton } from "@/components/chat-ui";
 import { InviteActions } from "@/components/deal-invite";
+import { RatingBadge } from "@/components/deal-close";
 import { KindBadge, type ChatKind } from "@/components/kind-badge";
 import { Logo } from "@/components/logo";
 import { NewChatPanel } from "@/components/new-chat-panel";
@@ -30,6 +31,7 @@ type Row = {
   pending?: boolean;
   rejected?: boolean;
   inviteDeal?: Deal;
+  rating?: number | null;
 };
 
 const TABS: { id: ListTab; label: string }[] = [
@@ -66,6 +68,13 @@ function dealPreview(deal: Deal): ReactNode {
     );
   }
   const last = deal.messages[deal.messages.length - 1];
+  if (deal.status === "disputed") {
+    return (
+      <Preview>
+        <span className="text-[#C4554D]">⚠️ Mojaro</span>
+      </Preview>
+    );
+  }
   if (deal.status === "completed") {
     return (
       <Preview icon={<CheckCheck size={16} className="text-[#2E9E5B]" />}>
@@ -102,26 +111,30 @@ function poolPreview(pool: PoolRequest): ReactNode {
 
 export function LeftPanel() {
   const pathname = usePathname();
-  const { me, deals, pools, unread, archived, openNewChat, listTab: tab, setListTab: setTab, incomingInvites, respondToInvite } = useApp();
+  const { me, deals, contacts, pools, unread, archived, openNewChat, listTab: tab, setListTab: setTab, incomingInvites, respondToInvite } = useApp();
   const [query, setQuery] = useState("");
 
   const rows = useMemo<Row[]>(() => {
     const dealRows: Row[] = deals
       .filter((deal) => !deal.incomingInvite)
-      .map((deal) => ({
-        id: deal.id,
-        kind: "deal",
-        chatKind: deal.kind ?? "kelishuv",
-        href: `/dashboard/deals/${deal.id}`,
-        avatar: <Avatar initials={initialsOf(deal.counterparty)} size="xl" />,
-        name: deal.title,
-        time: listTime(deal.updatedAt),
-        preview: dealPreview(deal),
-        unread: unread[deal.id] ?? 0,
-        hay: `${deal.title} ${deal.counterparty}`.toLowerCase(),
-        pending: deal.status === "pending",
-        rejected: deal.status === "rejected",
-      }));
+      .map((deal) => {
+        const otherId = deal.parties.find((p) => p.userId && p.userId !== me.id)?.userId;
+        return {
+          id: deal.id,
+          kind: "deal" as const,
+          chatKind: deal.kind ?? "kelishuv",
+          href: `/dashboard/deals/${deal.id}`,
+          avatar: <Avatar initials={initialsOf(deal.counterparty)} size="xl" />,
+          name: deal.title,
+          time: listTime(deal.updatedAt),
+          preview: dealPreview(deal),
+          unread: unread[deal.id] ?? 0,
+          hay: `${deal.title} ${deal.counterparty}`.toLowerCase(),
+          pending: deal.status === "pending",
+          rejected: deal.status === "rejected",
+          rating: otherId ? contacts.find((c) => c.id === otherId)?.avgRating ?? null : null,
+        };
+      });
     const inviteRows: Row[] = incomingInvites.map((deal) => ({
       id: deal.id,
       kind: "invite",
@@ -153,7 +166,7 @@ export function LeftPanel() {
     if (tab === "deals") return [...inviteRows, ...dealRows].filter((r) => !archived.includes(r.id));
     if (tab === "pools") return poolRows.filter((r) => !archived.includes(r.id));
     return [...dealRows, ...poolRows].filter((r) => archived.includes(r.id));
-  }, [deals, pools, unread, archived, tab, incomingInvites]);
+  }, [deals, pools, unread, archived, tab, incomingInvites, contacts, me.id]);
 
   const q = query.trim().toLowerCase();
   const visible = q ? rows.filter((r) => r.hay.includes(q)) : rows;
@@ -267,6 +280,7 @@ export function LeftPanel() {
                 <span className="flex items-baseline justify-between gap-2">
                   <span className="flex min-w-0 items-center gap-1.5">
                     <span className="truncate text-[15px] font-semibold text-ink">{row.name}</span>
+                    <RatingBadge rating={row.rating} />
                     <KindBadge kind={row.chatKind} size="sm" />
                     {row.pending ? (
                       <span className="shrink-0 rounded-[3px] bg-[#F6EFD9] px-1.5 py-px text-[10.5px] font-medium text-[#8A6B2E]">
@@ -319,7 +333,10 @@ export function LeftPanel() {
       <footer className="hidden h-[60px] shrink-0 items-center gap-3 border-t border-line px-3 md:flex">
         <Avatar initials={me.initials} size="hd" />
         <div className="min-w-0 flex-1">
-          <p className="truncate text-[14px] font-semibold text-ink">{me.name}</p>
+          <p className="flex items-center gap-1.5 truncate text-[14px] font-semibold text-ink">
+            {me.name}
+            <RatingBadge rating={me.avgRating} />
+          </p>
           <p className="flex items-center gap-1.5 text-[12px] text-ink2">
             <span className="h-1.5 w-1.5 rounded-full bg-[#2E9E5B]" />
             Onlayn
