@@ -7,7 +7,6 @@ const NAV = [
   { href: "#muammo", label: "Muammo" },
   { href: "#qanday", label: "Qanday ishlaydi" },
   { href: "#xususiyatlar", label: "Xususiyatlar" },
-  { href: "#pool-qarz", label: "Pool Qarz" },
   { href: "#narxlar", label: "Narxlar" },
 ];
 
@@ -192,11 +191,6 @@ export default function HomePage() {
                 body: "Siz chatda gaplashasiz. AI shartlarni o'qib, tayyor shartnoma chiqaradi. Qoralamani tuzatishingiz mumkin.",
               },
               {
-                icon: "👥",
-                title: "Pool Qarz",
-                body: "Bir kishi so'raydi, do'stlar yig'adi. Kim qancha qo'shgani hammaga ochiq — bahs chiqmaydi.",
-              },
-              {
                 icon: "✍️",
                 title: "Raqamli Imzo",
                 body: "Har ikki tomon elektron imzo qo'yadi. Hujjat yuklab olinadi va arxivda qoladi.",
@@ -229,32 +223,6 @@ export default function HomePage() {
         </div>
       </section>
 
-      <section id="pool-qarz" className="scroll-mt-16 bg-white px-5 py-20">
-        <div className="mx-auto grid max-w-6xl items-center gap-12 lg:grid-cols-2">
-          <div>
-            <span className="inline-flex rounded-full border border-[#ddd] px-3 py-1 text-[11px] font-bold tracking-[0.12em]">
-              YANGI
-            </span>
-            <h2 className="mt-4 text-3xl font-bold tracking-tight sm:text-4xl">Do&apos;stlardan qarz yig&apos;ish</h2>
-            <p className="mt-4 max-w-md text-[16px] leading-7 text-[#666]">
-              Bir kishi so&apos;raydi, do&apos;stlar yig&apos;adi. Kim qancha bergani, qancha qolgani va qaytarish muddati
-              hammaga ochiq. Yashirin chatlar yo&apos;q — hammasi bitta Pool Qarzda.
-            </p>
-            <ul className="mt-8 space-y-3">
-              {["Bir nechta qarz beruvchi", "Avtomatik hisob-kitob", "Hamma ko'radigan progress"].map((point) => (
-                <li key={point} className="flex items-center gap-3 text-[15px]">
-                  <span className="flex h-6 w-6 items-center justify-center rounded-full bg-[#111] text-[11px] text-white">
-                    ✓
-                  </span>
-                  {point}
-                </li>
-              ))}
-            </ul>
-          </div>
-          <PoolCard />
-        </div>
-      </section>
-
       <section className="px-5 py-20">
         <div className="mx-auto max-w-6xl">
           <h2 className="text-3xl font-bold tracking-tight sm:text-4xl">Foydalanuvchilar aytadi</h2>
@@ -269,7 +237,7 @@ export default function HomePage() {
                 role: "Freelance dizayner",
               },
               {
-                text: "Oilaviy yig'imda kim qancha bergani aralashib ketardi. Pool Qarz hammaga ochiq ko'rsatadi. Bahs yo'q.",
+                text: "Yetkazib beruvchi bilan avval og'zaki kelishardik. Endi chatda yozamiz, imzo qo'yamiz — bahs yo'q.",
                 name: "Madina Yusupova",
                 role: "Tadbirkor",
               },
@@ -418,11 +386,6 @@ export default function HomePage() {
                   </a>
                 </li>
                 <li>
-                  <a href="#pool-qarz" className="text-[14px] text-[#666] hover:text-[#111]">
-                    Pool Qarz
-                  </a>
-                </li>
-                <li>
                   <a href="#narxlar" className="text-[14px] text-[#666] hover:text-[#111]">
                     Narxlar
                   </a>
@@ -468,34 +431,6 @@ export default function HomePage() {
           <p className="mt-12 text-[13px] text-[#999]">© 2024 Ahd. Barcha huquqlar himoyalangan.</p>
         </div>
       </footer>
-    </div>
-  );
-}
-
-function PoolCard() {
-  return (
-    <div className="rounded-3xl border border-[#e5e5e5] bg-[#f5f5f5] p-6">
-      <p className="text-[12px] font-semibold text-[#888]">Pool Qarz</p>
-      <p className="mt-1 text-[32px] font-bold tracking-tight">12 000 000</p>
-      <p className="text-[13px] text-[#999]">so&apos;m · ta&apos;lim uchun</p>
-      <div className="mt-4 h-2 overflow-hidden rounded-full bg-[#e5e5e5]">
-        <div className="h-full w-2/3 rounded-full bg-[#111]" />
-      </div>
-      <p className="mt-2 text-[13px] text-[#666]">8 000 000 / 12 000 000 · 67%</p>
-      <div className="mt-5 space-y-3">
-        {[
-          ["MK", "Madina", "4 000 000"],
-          ["SA", "Sardor", "4 000 000"],
-        ].map(([ini, name, sum]) => (
-          <div key={name} className="flex items-center gap-3 rounded-2xl bg-white px-3 py-2.5">
-            <span className="flex h-8 w-8 items-center justify-center rounded-full bg-[#111] text-[11px] font-bold text-white">
-              {ini}
-            </span>
-            <span className="flex-1 text-[14px]">{name}</span>
-            <span className="text-[14px] font-semibold">{sum}</span>
-          </div>
-        ))}
-      </div>
     </div>
   );
 }
