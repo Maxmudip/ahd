@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useMemo, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { CheckCheck, FileText, Paperclip, PenLine, Search, Settings, SquarePen, Wallet } from "lucide-react";
 import { Avatar, GroupAvatar } from "@/components/avatar";
 import { useApp, type ListTab } from "@/components/app-store";
@@ -119,6 +119,35 @@ export function LeftPanel() {
   const [query, setQuery] = useState("");
   const [swipeId, setSwipeId] = useState<string | null>(null);
   const [deleteId, setDeleteId] = useState<string | null>(null);
+  const [leaving, setLeaving] = useState<string | null>(null);
+  const [toast, setToast] = useState<{ id: string; text: string; undo?: () => void } | null>(null);
+  const toastTimer = useRef<number>(0);
+
+  useEffect(() => {
+    if (!swipeId) return;
+    const close = (event: Event) => {
+      const target = event.target as HTMLElement | null;
+      if (target?.closest(`[data-swipe-row="${swipeId}"]`)) return;
+      setSwipeId(null);
+    };
+    document.addEventListener("pointerdown", close);
+    return () => document.removeEventListener("pointerdown", close);
+  }, [swipeId]);
+
+  function flashToast(next: { id: string; text: string; undo?: () => void }) {
+    window.clearTimeout(toastTimer.current);
+    setToast(next);
+    toastTimer.current = window.setTimeout(() => setToast(null), 3000);
+  }
+
+  function runLeave(id: string, after: () => void) {
+    setSwipeId(null);
+    setLeaving(id);
+    window.setTimeout(() => {
+      after();
+      setLeaving((current) => (current === id ? null : current));
+    }, 280);
+  }
 
   const rows = useMemo<Row[]>(() => {
     const dealRows: Row[] = deals
@@ -279,14 +308,26 @@ export function LeftPanel() {
               row={row}
               active={pathname === row.href}
               swipeOpen={swipeId === row.id}
+              leaving={leaving === row.id}
               onSwipeOpen={(open) => setSwipeId(open ? row.id : null)}
-              archiveLabel={row.archived || tab === "archive" ? "Chiqarish" : "Arxiv"}
+              archiveLabel="Arxiv"
               onArchive={() => {
-                toggleArchive(row.id);
-                setSwipeId(null);
+                const wasArchived = Boolean(row.archived);
+                runLeave(row.id, () => {
+                  toggleArchive(row.id);
+                  flashToast({
+                    id: row.id,
+                    text: wasArchived ? "Arxivdan chiqarildi ✓" : "Arxivlandi ✓",
+                    undo: () => toggleArchive(row.id),
+                  });
+                });
               }}
               onDelete={() => {
                 setSwipeId(null);
+                if (!row.canDelete) {
+                  flashToast({ id: row.id, text: "O'chirish faqat muallifga ruxsat." });
+                  return;
+                }
                 setDeleteId(row.id);
               }}
             />
@@ -335,16 +376,37 @@ export function LeftPanel() {
       <NewChatPanel />
       <ConfirmSheet
         open={Boolean(deleteId)}
-        title="Kelishuvni o'chirish"
-        body={"Kelishuvni o'chirishni tasdiqlaysizmi?\nBu amalni qaytarib bo'lmaydi."}
-        confirmLabel="O'chirish"
+        title="O'chirishni tasdiqlaysizmi?"
+        body="Bu amalni qaytarib bo'lmaydi."
+        confirmLabel="Ha, o'chirish"
         onCancel={() => setDeleteId(null)}
         onConfirm={() => {
           const id = deleteId;
           setDeleteId(null);
-          if (id) void deleteDeal(id);
+          if (id) runLeave(id, () => void deleteDeal(id));
         }}
       />
+      {toast ? (
+        <div
+          role="status"
+          className="toast-in absolute bottom-[72px] left-3 right-3 z-50 flex items-center gap-3 rounded-[12px] bg-[#111] px-3 py-2.5 text-[13.5px] text-white shadow-[0_8px_24px_rgba(0,0,0,0.2)] md:bottom-16"
+        >
+          <span className="min-w-0 flex-1">{toast.text}</span>
+          {toast.undo ? (
+            <button
+              type="button"
+              onClick={() => {
+                toast.undo?.();
+                window.clearTimeout(toastTimer.current);
+                setToast(null);
+              }}
+              className="shrink-0 text-[13px] font-semibold text-[#F59E0B]"
+            >
+              Bekor qilish
+            </button>
+          ) : null}
+        </div>
+      ) : null}
     </div>
   );
 }
@@ -400,6 +462,7 @@ function SwipeableChatRow({
   row,
   active,
   swipeOpen,
+  leaving,
   onSwipeOpen,
   archiveLabel,
   onArchive,
@@ -408,6 +471,7 @@ function SwipeableChatRow({
   row: Row;
   active: boolean;
   swipeOpen: boolean;
+  leaving: boolean;
   onSwipeOpen: (open: boolean) => void;
   archiveLabel: string;
   onArchive: () => void;
@@ -416,15 +480,18 @@ function SwipeableChatRow({
   const card = <ChatRowLink row={row} active={active} />;
   if (row.kind !== "deal") return card;
   return (
-    <SwipeRow
-      open={swipeOpen}
-      onOpenChange={onSwipeOpen}
-      archiveLabel={archiveLabel}
-      canDelete={Boolean(row.canDelete)}
-      onArchive={onArchive}
-      onDelete={onDelete}
-    >
-      {card}
-    </SwipeRow>
+    <div data-swipe-row={row.id}>
+      <SwipeRow
+        open={swipeOpen}
+        leaving={leaving}
+        onOpenChange={onSwipeOpen}
+        archiveLabel={archiveLabel}
+        canDelete={Boolean(row.canDelete)}
+        onArchive={onArchive}
+        onDelete={onDelete}
+      >
+        {card}
+      </SwipeRow>
+    </div>
   );
 }

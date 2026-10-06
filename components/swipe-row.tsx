@@ -1,101 +1,169 @@
 "use client";
 
-import { useEffect, useRef, useState, type ReactNode, type PointerEvent } from "react";
+import { useEffect, useRef, useState, type ReactNode, type MouseEvent } from "react";
 
-const BTN = 80;
+const BTN = 70;
+const TRIGGER = 50;
 
-/** iOS Mail / Messages swipe: drag left to reveal archive + delete. */
+type Drag = { x: number; y: number; tx: number; axis?: "h" | "v" };
+
+/** Telegram-style swipe: left reveals actions, right does nothing, spring snap-back. */
 export function SwipeRow({
   open,
   onOpenChange,
-  archiveLabel,
-  canDelete,
+  leaving = false,
+  archiveLabel = "Arxiv",
+  canDelete = true,
   onArchive,
   onDelete,
   children,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  archiveLabel: string;
-  canDelete: boolean;
+  leaving?: boolean;
+  archiveLabel?: string;
+  canDelete?: boolean;
   onArchive: () => void;
   onDelete: () => void;
   children: ReactNode;
 }) {
-  const max = canDelete ? BTN * 2 : BTN;
+  const max = BTN * 2;
   const [tx, setTx] = useState(0);
-  const start = useRef<{ x: number; y: number; tx: number; axis?: "h" | "v" } | null>(null);
-  const dragged = useRef(false);
+  const [dragging, setDragging] = useState(false);
+  const txRef = useRef(0);
+  const drag = useRef<Drag | null>(null);
+  const moved = useRef(false);
+  const rootRef = useRef<HTMLDivElement>(null);
+  const openRef = useRef(open);
+  const onOpenRef = useRef(onOpenChange);
+  openRef.current = open;
+  onOpenRef.current = onOpenChange;
+
+  function setOffset(value: number) {
+    txRef.current = value;
+    setTx(value);
+  }
 
   useEffect(() => {
-    setTx(open ? -max : 0);
-  }, [open, max]);
+    if (!dragging) setOffset(open ? -max : 0);
+  }, [open, max, dragging]);
 
-  function down(event: PointerEvent<HTMLDivElement>) {
-    start.current = { x: event.clientX, y: event.clientY, tx };
-    dragged.current = false;
+  function finish() {
+    const s = drag.current;
+    drag.current = null;
+    setDragging(false);
+    if (!s || s.axis !== "h") return;
+    const offset = txRef.current;
+    const traveled = Math.abs(offset - s.tx);
+    if (traveled < TRIGGER) {
+      setOffset(openRef.current ? -max : 0);
+      return;
+    }
+    const shouldOpen = offset <= -TRIGGER;
+    onOpenRef.current(shouldOpen);
+    setOffset(shouldOpen ? -max : 0);
   }
 
-  function move(event: PointerEvent<HTMLDivElement>) {
-    const s = start.current;
-    if (!s) return;
-    const dx = event.clientX - s.x;
-    const dy = event.clientY - s.y;
-    if (!s.axis && Math.hypot(dx, dy) > 6) {
+  function shift(x: number, y: number) {
+    const s = drag.current;
+    if (!s) return false;
+    const dx = x - s.x;
+    const dy = y - s.y;
+    if (!s.axis && Math.hypot(dx, dy) > 8) {
       s.axis = Math.abs(dx) > Math.abs(dy) ? "h" : "v";
     }
-    if (s.axis !== "h") return;
-    event.preventDefault();
-    dragged.current = true;
-    const next = Math.min(0, Math.max(-max, s.tx + dx));
-    setTx(next);
+    if (s.axis !== "h") return false;
+    moved.current = true;
+    setOffset(Math.min(0, Math.max(-max - 16, s.tx + dx)));
+    return true;
   }
 
-  function up() {
-    const s = start.current;
-    start.current = null;
-    if (!s || s.axis !== "h") return;
-    const shouldOpen = Math.abs(tx) > max * 0.45;
-    onOpenChange(shouldOpen);
-    setTx(shouldOpen ? -max : 0);
+  useEffect(() => {
+    const el = rootRef.current;
+    if (!el) return;
+
+    const onTouchStart = (event: TouchEvent) => {
+      const t = event.touches[0];
+      if (!t) return;
+      drag.current = { x: t.clientX, y: t.clientY, tx: txRef.current };
+      moved.current = false;
+      setDragging(true);
+    };
+    const onTouchMove = (event: TouchEvent) => {
+      const t = event.touches[0];
+      if (!t) return;
+      if (shift(t.clientX, t.clientY)) event.preventDefault();
+    };
+    const onTouchEnd = () => finish();
+
+    el.addEventListener("touchstart", onTouchStart, { passive: true });
+    el.addEventListener("touchmove", onTouchMove, { passive: false });
+    el.addEventListener("touchend", onTouchEnd);
+    el.addEventListener("touchcancel", onTouchEnd);
+    return () => {
+      el.removeEventListener("touchstart", onTouchStart);
+      el.removeEventListener("touchmove", onTouchMove);
+      el.removeEventListener("touchend", onTouchEnd);
+      el.removeEventListener("touchcancel", onTouchEnd);
+    };
+  }, [max]);
+
+  function onMouseDown(event: MouseEvent) {
+    if (event.button !== 0) return;
+    drag.current = { x: event.clientX, y: event.clientY, tx: txRef.current };
+    moved.current = false;
+    setDragging(true);
+
+    const onMove = (e: globalThis.MouseEvent) => {
+      if (shift(e.clientX, e.clientY)) e.preventDefault();
+    };
+    const onUp = () => {
+      window.removeEventListener("mousemove", onMove);
+      window.removeEventListener("mouseup", onUp);
+      finish();
+    };
+    window.addEventListener("mousemove", onMove);
+    window.addEventListener("mouseup", onUp);
   }
 
   return (
-    <div className="relative overflow-hidden">
-      <div className="absolute inset-y-0 right-0 flex">
+    <div ref={rootRef} className={`relative overflow-hidden ${leaving ? "swipe-exit" : ""}`}>
+      <div className="absolute inset-y-1 right-1 flex gap-1">
         <button
           type="button"
           onClick={onArchive}
-          className="flex w-20 flex-col items-center justify-center bg-[#E8B84A] text-[12px] font-semibold text-[#3B2F0B]"
+          className="flex w-[70px] flex-col items-center justify-center rounded-[10px] bg-[#F59E0B] text-[12px] font-semibold text-white"
         >
-          📦
-          <span className="mt-0.5">{archiveLabel}</span>
+          <span className="text-[18px] leading-none" aria-hidden>
+            📦
+          </span>
+          <span className="mt-1">{archiveLabel}</span>
         </button>
-        {canDelete ? (
-          <button
-            type="button"
-            onClick={onDelete}
-            className="flex w-20 flex-col items-center justify-center bg-[#C4554D] text-[12px] font-semibold text-white"
-          >
+        <button
+          type="button"
+          onClick={onDelete}
+          className="flex w-[70px] flex-col items-center justify-center rounded-[10px] bg-[#EF4444] text-[12px] font-semibold text-white"
+        >
+          <span className="text-[18px] leading-none" aria-hidden>
             🗑️
-            <span className="mt-0.5">O&apos;chirish</span>
-          </button>
-        ) : null}
+          </span>
+          <span className="mt-1">O&apos;chir</span>
+        </button>
       </div>
       <div
-        onPointerDown={down}
-        onPointerMove={move}
-        onPointerUp={up}
-        onPointerCancel={up}
+        onMouseDown={onMouseDown}
         onClickCapture={(event) => {
-          if (open || dragged.current) {
+          if (open || moved.current) {
             event.preventDefault();
             event.stopPropagation();
-            if (open && !dragged.current) onOpenChange(false);
+            if (open && !moved.current) onOpenChange(false);
           }
         }}
-        style={{ transform: `translate3d(${tx}px,0,0)`, touchAction: "pan-y" }}
-        className="relative z-[1] bg-panel transition-transform duration-150 ease-out"
+        style={{
+          transform: `translate3d(${tx}px,0,0)`,
+          transition: dragging ? "none" : "transform 0.38s cubic-bezier(0.22, 1.2, 0.36, 1)",
+        }}
+        className="relative z-[1] select-none bg-panel"
       >
         {children}
       </div>

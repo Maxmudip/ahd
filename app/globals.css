@@ -469,3 +469,23 @@ textarea.field {
   display: inline-block;
   animation: check-pop 0.45s cubic-bezier(0.32, 0.72, 0, 1) both;
 }
+
+@keyframes swipe-exit {
+  to {
+    transform: translateX(-110%);
+    opacity: 0;
+    max-height: 0;
+    margin: 0;
+    padding-top: 0;
+    padding-bottom: 0;
+  }
+}
+
+.swipe-exit {
+  max-height: 88px;
+  animation: swipe-exit 0.28s ease forwards;
+}
+
+.toast-in {
+  animation: check-pop 0.28s cubic-bezier(0.32, 0.72, 0, 1) both;
+}
