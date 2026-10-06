@@ -407,10 +407,28 @@ function groupBy<T>(rows: T[], key: (row: T) => string) {
   return map;
 }
 
+/** People in my contacts list — never the whole user directory. */
+async function fetchOwnedContactUsers(sb: SupabaseClient, meId: string): Promise<UserRow[]> {
+  const owned = await sb.from("contacts").select("contact_user_id").eq("user_id", meId);
+  if (owned.error) {
+    console.warn("[contacts] query failed:", owned.error.code, owned.error.message);
+    return [];
+  }
+  const ids = [...new Set((owned.data ?? []).map((row) => row.contact_user_id as string).filter(Boolean))];
+  if (ids.length === 0) return [];
+  const profiles = await sb.from("users").select("*").in("id", ids);
+  if (profiles.error) {
+    console.warn("[contacts] profiles failed:", profiles.error.code, profiles.error.message);
+    return [];
+  }
+  return (profiles.data ?? []) as UserRow[];
+}
+
 /** Everything the signed-in user can see (Row Level Security does the filtering). */
 export async function fetchAppData(sb: SupabaseClient, me: SessionUser): Promise<AppData> {
-  const [users, rooms, participants, messages, agreements, pools, contributions, invitations, ratings] = await Promise.all([
-    sb.from("users").select("*").then((r) => must<UserRow[]>(r)),
+  const [mine, contactUsers, rooms, participants, messages, agreements, pools, contributions, invitations, ratings] = await Promise.all([
+    sb.from("users").select("*").eq("id", me.id).then((r) => must<UserRow[]>(r)),
+    fetchOwnedContactUsers(sb, me.id),
     sb.from("deal_rooms").select("*").order("updated_at", { ascending: false }).then((r) => must<DealRoomRow[]>(r)),
     sb.from("deal_participants").select("*").then((r) => must<ParticipantRow[]>(r)),
     fetchAllRows<MessageRow>((from, to) =>
@@ -438,6 +456,7 @@ export async function fetchAppData(sb: SupabaseClient, me: SessionUser): Promise
     }),
   ]);
 
+  const users = [...mine, ...contactUsers.filter((u) => u.id !== me.id)];
   const now = new Date();
   const people = new Map(users.map((u) => [u.id, personFromUser(u)]));
   const person = (id: string): Person => people.get(id) ?? { id, name: "Foydalanuvchi", phone: "", initials: "?" };
@@ -471,7 +490,10 @@ export async function fetchAppData(sb: SupabaseClient, me: SessionUser): Promise
       ),
     ),
     pools: pools.map((row) => buildPool(row, contribByPool.get(row.id) ?? [], person, me.id, now)),
-    contacts: users.filter((u) => u.id !== me.id).map(personFromUser).sort((a, b) => a.name.localeCompare(b.name)),
+    contacts: contactUsers
+      .filter((u) => u.id !== me.id)
+      .map(personFromUser)
+      .sort((a, b) => a.name.localeCompare(b.name)),
     reviews: ratings
       .filter((r) => r.rated_id === me.id)
       .map((r) => {
@@ -497,7 +519,7 @@ export async function fetchAppData(sb: SupabaseClient, me: SessionUser): Promise
 
 /** Just the contact list (people you can start a chat or a pool with). */
 export async function fetchContacts(sb: SupabaseClient, me: SessionUser): Promise<Person[]> {
-  const users = must<UserRow[]>(await sb.from("users").select("id, full_name, email, phone"));
+  const users = await fetchOwnedContactUsers(sb, me.id);
   return users.filter((u) => u.id !== me.id).map(personFromUser).sort((a, b) => a.name.localeCompare(b.name));
 }
 
