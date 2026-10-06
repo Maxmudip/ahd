@@ -127,6 +127,7 @@ export type Deal = {
   completedAt?: string | null;
   disputedAt?: string | null;
   ratedByMe?: boolean;
+  archived?: boolean;
 };
 
 export const STATUS_LABEL: Record<DealStatus, string> = {

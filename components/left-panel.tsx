@@ -8,6 +8,8 @@ import { Avatar, GroupAvatar } from "@/components/avatar";
 import { useApp, type ListTab } from "@/components/app-store";
 import { EmptyNote, IconButton } from "@/components/chat-ui";
 import { InviteActions } from "@/components/deal-invite";
+import { ConfirmSheet } from "@/components/sheet";
+import { SwipeRow } from "@/components/swipe-row";
 import { RatingBadge } from "@/components/deal-close";
 import { KindBadge, type ChatKind } from "@/components/kind-badge";
 import { Logo } from "@/components/logo";
@@ -32,6 +34,8 @@ type Row = {
   rejected?: boolean;
   inviteDeal?: Deal;
   rating?: number | null;
+  canDelete?: boolean;
+  archived?: boolean;
 };
 
 const TABS: { id: ListTab; label: string }[] = [
@@ -111,8 +115,10 @@ function poolPreview(pool: PoolRequest): ReactNode {
 
 export function LeftPanel() {
   const pathname = usePathname();
-  const { me, deals, contacts, pools, unread, archived, openNewChat, listTab: tab, setListTab: setTab, incomingInvites, respondToInvite } = useApp();
+  const { me, deals, contacts, pools, unread, archived, openNewChat, listTab: tab, setListTab: setTab, incomingInvites, respondToInvite, toggleArchive, deleteDeal } = useApp();
   const [query, setQuery] = useState("");
+  const [swipeId, setSwipeId] = useState<string | null>(null);
+  const [deleteId, setDeleteId] = useState<string | null>(null);
 
   const rows = useMemo<Row[]>(() => {
     const dealRows: Row[] = deals
@@ -133,6 +139,8 @@ export function LeftPanel() {
           pending: deal.status === "pending",
           rejected: deal.status === "rejected",
           rating: otherId ? contacts.find((c) => c.id === otherId)?.avgRating ?? null : null,
+          canDelete: deal.createdBy === me.id,
+          archived: Boolean(deal.archived),
         };
       });
     const inviteRows: Row[] = incomingInvites.map((deal) => ({
@@ -266,45 +274,22 @@ export function LeftPanel() {
               </div>
             </div>
           ) : (
-            <Link
+            <SwipeableChatRow
               key={row.id}
-              href={row.href}
-              className={`flex min-h-[72px] items-center gap-3 px-3 ${
-                row.pending ? "border-l-[3px] border-l-[#C9A84C] bg-[#FFFBEB]" : ""
-              } ${row.rejected ? "border-l-[3px] border-l-[#E8B4B0]" : ""} ${
-                pathname === row.href ? "bg-sel" : "hover:bg-hov"
-              }`}
-            >
-              {row.avatar}
-              <span className="min-w-0 flex-1">
-                <span className="flex items-baseline justify-between gap-2">
-                  <span className="flex min-w-0 items-center gap-1.5">
-                    <span className="truncate text-[15px] font-semibold text-ink">{row.name}</span>
-                    <RatingBadge rating={row.rating} />
-                    <KindBadge kind={row.chatKind} size="sm" />
-                    {row.pending ? (
-                      <span className="shrink-0 rounded-[3px] bg-[#F6EFD9] px-1.5 py-px text-[10.5px] font-medium text-[#8A6B2E]">
-                        ⏳ Javob kutilmoqda
-                      </span>
-                    ) : null}
-                  </span>
-                  <span className={`shrink-0 text-[12px] ${row.unread ? "font-semibold text-ink" : "text-ink2"}`}>
-                    {row.time}
-                  </span>
-                </span>
-                <span className="mt-0.5 flex items-center gap-2">
-                  <span className="flex min-w-0 flex-1 text-[13.5px] text-ink2">{row.preview}</span>
-                  {row.unread > 0 ? (
-                    <span
-                      aria-label={`${row.unread} ta o'qilmagan`}
-                      className="inline-flex h-5 min-w-5 shrink-0 items-center justify-center rounded-full bg-badge px-1.5 text-[11px] font-semibold text-badgeink"
-                    >
-                      {row.unread}
-                    </span>
-                  ) : null}
-                </span>
-              </span>
-            </Link>
+              row={row}
+              active={pathname === row.href}
+              swipeOpen={swipeId === row.id}
+              onSwipeOpen={(open) => setSwipeId(open ? row.id : null)}
+              archiveLabel={row.archived || tab === "archive" ? "Chiqarish" : "Arxiv"}
+              onArchive={() => {
+                toggleArchive(row.id);
+                setSwipeId(null);
+              }}
+              onDelete={() => {
+                setSwipeId(null);
+                setDeleteId(row.id);
+              }}
+            />
           ),
         )}
 
@@ -348,6 +333,98 @@ export function LeftPanel() {
       </footer>
 
       <NewChatPanel />
+      <ConfirmSheet
+        open={Boolean(deleteId)}
+        title="Kelishuvni o'chirish"
+        body={"Kelishuvni o'chirishni tasdiqlaysizmi?\nBu amalni qaytarib bo'lmaydi."}
+        confirmLabel="O'chirish"
+        onCancel={() => setDeleteId(null)}
+        onConfirm={() => {
+          const id = deleteId;
+          setDeleteId(null);
+          if (id) void deleteDeal(id);
+        }}
+      />
     </div>
+  );
+}
+
+function ChatRowLink({
+  row,
+  active,
+}: {
+  row: Row;
+  active: boolean;
+}) {
+  return (
+    <Link
+      href={row.href}
+      className={`flex min-h-[72px] items-center gap-3 px-3 ${
+        row.pending ? "border-l-[3px] border-l-[#C9A84C] bg-[#FFFBEB]" : ""
+      } ${row.rejected ? "border-l-[3px] border-l-[#E8B4B0]" : ""} ${active ? "bg-sel" : "hover:bg-hov"}`}
+    >
+      {row.avatar}
+      <span className="min-w-0 flex-1">
+        <span className="flex items-baseline justify-between gap-2">
+          <span className="flex min-w-0 items-center gap-1.5">
+            <span className="truncate text-[15px] font-semibold text-ink">{row.name}</span>
+            <RatingBadge rating={row.rating} />
+            <KindBadge kind={row.chatKind} size="sm" />
+            {row.pending ? (
+              <span className="shrink-0 rounded-[3px] bg-[#F6EFD9] px-1.5 py-px text-[10.5px] font-medium text-[#8A6B2E]">
+                ⏳ Javob kutilmoqda
+              </span>
+            ) : null}
+          </span>
+          <span className={`shrink-0 text-[12px] ${row.unread ? "font-semibold text-ink" : "text-ink2"}`}>
+            {row.time}
+          </span>
+        </span>
+        <span className="mt-0.5 flex items-center gap-2">
+          <span className="flex min-w-0 flex-1 text-[13.5px] text-ink2">{row.preview}</span>
+          {row.unread > 0 ? (
+            <span
+              aria-label={`${row.unread} ta o'qilmagan`}
+              className="inline-flex h-5 min-w-5 shrink-0 items-center justify-center rounded-full bg-badge px-1.5 text-[11px] font-semibold text-badgeink"
+            >
+              {row.unread}
+            </span>
+          ) : null}
+        </span>
+      </span>
+    </Link>
+  );
+}
+
+function SwipeableChatRow({
+  row,
+  active,
+  swipeOpen,
+  onSwipeOpen,
+  archiveLabel,
+  onArchive,
+  onDelete,
+}: {
+  row: Row;
+  active: boolean;
+  swipeOpen: boolean;
+  onSwipeOpen: (open: boolean) => void;
+  archiveLabel: string;
+  onArchive: () => void;
+  onDelete: () => void;
+}) {
+  const card = <ChatRowLink row={row} active={active} />;
+  if (row.kind !== "deal") return card;
+  return (
+    <SwipeRow
+      open={swipeOpen}
+      onOpenChange={onSwipeOpen}
+      archiveLabel={archiveLabel}
+      canDelete={Boolean(row.canDelete)}
+      onArchive={onArchive}
+      onDelete={onDelete}
+    >
+      {card}
+    </SwipeRow>
   );
 }

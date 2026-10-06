@@ -3,7 +3,7 @@
 import { ChangeEvent, FormEvent, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
-import { Archive, Download, FileText, Paperclip, Sparkles, Users } from "lucide-react";
+import { Download, FileText, Paperclip, Sparkles, Users } from "lucide-react";
 import { AgreementPaper } from "@/components/agreement-paper";
 import { useApp } from "@/components/app-store";
 import { MediatorTip, MediatorTyping, type MediatorTipData } from "@/components/ai-mediator";
@@ -34,6 +34,7 @@ import {
   RatingSheet,
 } from "@/components/deal-close";
 import { DealGate } from "@/components/deal-invite";
+import { ConfirmSheet } from "@/components/sheet";
 import { KindBadge } from "@/components/kind-badge";
 import { StatusBadge } from "@/components/status-badge";
 import { formatFileSize, freshId, initialsOf, nameColor } from "@/lib/chat-helpers";
@@ -60,7 +61,7 @@ export default function DealChatPage() {
   const params = useParams<{ id: string }>();
   const id = params.id;
   const router = useRouter();
-  const { me, deals, contacts, hydrated, updateDeal, markRead, archived, toggleArchive, respondToInvite, resendInvite, submitRating } = useApp();
+  const { me, deals, contacts, hydrated, updateDeal, markRead, archived, toggleArchive, deleteDeal, respondToInvite, resendInvite, submitRating } = useApp();
   const deal = deals.find((d) => d.id === id) ?? null;
 
   const [draft, setDraft] = useState("");
@@ -69,7 +70,7 @@ export default function DealChatPage() {
   const [drawer, setDrawer] = useState<"doc" | "people" | null>(null);
   const [notice, setNotice] = useState("");
   const [genError, setGenError] = useState("");
-  const [sheet, setSheet] = useState<null | "close" | "success" | "rate">(null);
+  const [sheet, setSheet] = useState<null | "close" | "success" | "rate" | "delete">(null);
   const skippedRate = useRef(false);
   // AI Mediator: live-session tips only — kept out of deal.messages so they are never saved or counted.
   const [tips, setTips] = useState<(MediatorTipData & { dealId: string })[]>([]);
@@ -457,7 +458,8 @@ export default function DealChatPage() {
     );
   }
 
-  const isArchived = archived.includes(deal.id);
+  const isArchived = Boolean(deal.archived) || archived.includes(deal.id);
+  const canDelete = deal.createdBy === me.id;
   const kind = deal.kind ?? "kelishuv";
   const chatOpen = isDealActive(deal.status) && !deal.incomingInvite;
   const otherId = deal.parties.find((p) => p.userId && p.userId !== me.id)?.userId ?? null;
@@ -476,7 +478,22 @@ export default function DealChatPage() {
           subtitle={deal.counterparty}
           extra={<RolePills items={dealRolePills(deal, me.id, me.name)} />}
           center={<KindBadge kind={kind} />}
-          actions={null}
+          actions={
+            <MenuButton
+              items={[
+                {
+                  label: isArchived ? "📦 Arxivdan chiqarish" : "📦 Arxivlash",
+                  onClick: () => toggleArchive(deal.id),
+                },
+                {
+                  label: "🗑️ O'chirish",
+                  danger: true,
+                  disabled: !canDelete,
+                  onClick: () => setSheet("delete"),
+                },
+              ]}
+            />
+          }
         />
         <DealGate
           deal={deal}
@@ -484,6 +501,17 @@ export default function DealChatPage() {
           onAccept={() => (deal.invitation ? respondToInvite(deal.invitation.id, true) : Promise.resolve())}
           onReject={() => (deal.invitation ? respondToInvite(deal.invitation.id, false) : Promise.resolve())}
           onResend={(email) => resendInvite(deal.id, email)}
+        />
+        <ConfirmSheet
+          open={sheet === "delete"}
+          title="Kelishuvni o'chirish"
+          body={"Kelishuvni o'chirishni tasdiqlaysizmi?\nBu amalni qaytarib bo'lmaydi."}
+          confirmLabel="O'chirish"
+          onCancel={() => setSheet(null)}
+          onConfirm={() => {
+            setSheet(null);
+            void deleteDeal(deal.id);
+          }}
         />
       </div>
     );
@@ -557,6 +585,28 @@ export default function DealChatPage() {
             <MenuButton
               items={[
                 {
+                  label: isArchived ? "📦 Arxivdan chiqarish" : "📦 Arxivlash",
+                  onClick: () => {
+                    toggleArchive(deal.id);
+                    flash(isArchived ? "Arxivdan chiqarildi." : "Arxivga ko'chirildi.");
+                  },
+                },
+                {
+                  label: "🗑️ O'chirish",
+                  danger: true,
+                  disabled: !canDelete,
+                  onClick: () => setSheet("delete"),
+                },
+                {
+                  label: "📋 Hujjatni ko'rish",
+                  disabled: !deal.agreement,
+                  onClick: () => setDrawer("doc"),
+                },
+                {
+                  label: "👥 Ishtirokchilar",
+                  onClick: () => setDrawer("people"),
+                },
+                {
                   label: "PDF yuklash",
                   icon: <Download size={16} />,
                   disabled: !deal.agreement,
@@ -576,14 +626,6 @@ export default function DealChatPage() {
                 ...(deal.status === "completed" && !deal.ratedByMe
                   ? [{ label: "Baholash", onClick: () => setSheet("rate") }]
                   : []),
-                {
-                  label: isArchived ? "Arxivdan chiqarish" : "Arxivlash",
-                  icon: <Archive size={16} />,
-                  onClick: () => {
-                    toggleArchive(deal.id);
-                    flash(isArchived ? "Arxivdan chiqarildi." : "Arxivga ko'chirildi.");
-                  },
-                },
               ]}
             />
           </>
@@ -726,6 +768,17 @@ export default function DealChatPage() {
         </ul>
       </InfoDrawer>
 
+      <ConfirmSheet
+        open={sheet === "delete"}
+        title="Kelishuvni o'chirish"
+        body={"Kelishuvni o'chirishni tasdiqlaysizmi?\nBu amalni qaytarib bo'lmaydi."}
+        confirmLabel="O'chirish"
+        onCancel={() => setSheet(null)}
+        onConfirm={() => {
+          setSheet(null);
+          void deleteDeal(deal.id);
+        }}
+      />
       <CloseDealSheet open={sheet === "close"} onClose={() => setSheet(null)} onPick={requestClose} />
       <CompletedSheet
         open={sheet === "success"}

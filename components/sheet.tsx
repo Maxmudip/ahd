@@ -50,3 +50,44 @@ export function Sheet({
     </div>
   );
 }
+
+export function ConfirmSheet({
+  open,
+  title,
+  body,
+  confirmLabel,
+  onConfirm,
+  onCancel,
+}: {
+  open: boolean;
+  title: string;
+  body: string;
+  confirmLabel: string;
+  onConfirm: () => void;
+  onCancel: () => void;
+}) {
+  return (
+    <Sheet open={open} title={title} onClose={onCancel}>
+      <div className="px-5 pt-3 pb-[max(20px,env(safe-area-inset-bottom))]">
+        <p className="text-[17px] font-semibold text-ink">{title}</p>
+        <p className="mt-2 whitespace-pre-line text-[14.5px] leading-6 text-ink2">{body}</p>
+        <div className="mt-5 flex gap-2">
+          <button
+            type="button"
+            onClick={onCancel}
+            className="h-11 flex-1 rounded-[10px] border border-line text-[14px] font-medium text-ink hover:bg-hov"
+          >
+            Bekor qilish
+          </button>
+          <button
+            type="button"
+            onClick={onConfirm}
+            className="h-11 flex-1 rounded-[10px] bg-[#C4554D] text-[14px] font-semibold text-white hover:opacity-90"
+          >
+            {confirmLabel}
+          </button>
+        </div>
+      </div>
+    </Sheet>
+  );
+}

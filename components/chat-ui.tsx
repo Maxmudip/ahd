@@ -242,6 +242,7 @@ export type MenuItem = {
   icon?: ReactNode;
   onClick: () => void;
   disabled?: boolean;
+  danger?: boolean;
 };
 
 export function MenuButton({ items }: { items: MenuItem[] }) {
@@ -268,7 +269,9 @@ export function MenuButton({ items }: { items: MenuItem[] }) {
                   setOpen(false);
                   item.onClick();
                 }}
-                className="flex h-11 w-full items-center gap-3 px-4 text-left text-[14px] text-ink hover:bg-hov md:h-10 disabled:opacity-40 disabled:hover:bg-transparent"
+                className={`flex h-11 w-full items-center gap-3 px-4 text-left text-[14px] hover:bg-hov md:h-10 disabled:opacity-40 disabled:hover:bg-transparent ${
+                  item.danger ? "text-[#C4554D]" : "text-ink"
+                }`}
               >
                 <span className="text-ink2">{item.icon}</span>
                 {item.label}

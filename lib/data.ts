@@ -59,6 +59,7 @@ type DealRoomRow = {
   completion_status?: CompletionStatus | null;
   completed_at?: string | null;
   disputed_at?: string | null;
+  archived?: boolean;
 };
 type RatingRow = {
   id: string;
@@ -157,6 +158,9 @@ export function explainError(error: unknown): string {
   }
   if (e.code === "PGRST204" || text.includes("initiator_role")) {
     return "deal_rooms.initiator_role ustuni yo'q. Shu SQL faylini (deal_invitations) ishga tushiring.";
+  }
+  if (text.includes("archived") && (e.code === "PGRST204" || e.code === "42703")) {
+    return "deal_rooms.archived ustuni yo'q. supabase/migrations/20261006020000_deal_archive.sql ni ishga tushiring.";
   }
   if (e.code === "PGRST205" || e.code === "42P01" || text.includes("ratings")) {
     return "ratings jadvali yo'q. Supabase SQL Editor'da supabase/migrations/20261006010000_deal_close_ratings.sql ni ishga tushiring.";
@@ -313,6 +317,7 @@ function buildDeal(
     completedAt: room.completed_at ? formatUzDate(new Date(room.completed_at)) : null,
     disputedAt: room.disputed_at ? formatUzDate(new Date(room.disputed_at)) : null,
     ratedByMe,
+    archived: Boolean(room.archived),
   };
 }
 
@@ -698,6 +703,13 @@ export async function saveDealChange(sb: SupabaseClient, me: SessionUser, prev: 
     }
   }
 
+  if (Boolean(next.archived) !== Boolean(prev.archived)) {
+    const archived = await sb.from("deal_rooms").update({ archived: Boolean(next.archived) }).eq("id", next.id);
+    if (archived.error) {
+      console.warn("[saveDealChange] archived column missing — run 20261006020000_deal_archive.sql");
+    }
+  }
+
   if (added.length) {
     const base = Date.now();
     check(await sb.from("messages").insert(added.map((m, i) => messageRow(m, next.id, me.id, new Date(base + i)))));
@@ -726,6 +738,11 @@ export async function insertPool(sb: SupabaseClient, me: SessionUser, pool: Pool
       invited_ids: pool.invited.map((p) => p.id),
     }),
   );
+}
+
+export async function deleteDealRoom(sb: SupabaseClient, me: SessionUser, dealId: string) {
+  const result = await sb.from("deal_rooms").delete().eq("id", dealId).eq("created_by", me.id);
+  check(result);
 }
 
 export async function insertRating(

@@ -15,6 +15,7 @@ import {
   explainError,
   fetchAppData,
   fetchContacts,
+  deleteDealRoom,
   insertDeal,
   insertPool,
   insertRating,
@@ -81,6 +82,7 @@ type AppStore = {
   addPool: (pool: PoolRequest) => void;
   markRead: (id: string) => void;
   toggleArchive: (id: string) => void;
+  deleteDeal: (id: string) => Promise<void>;
   setTheme: (theme: Theme) => void;
   openNewChat: (seed?: string) => void;
   closeNewChat: () => void;
@@ -141,13 +143,6 @@ export function AppProvider({ user, children }: { user: SessionUser; children: R
     pathRef.current = pathname;
   }, [pathname]);
 
-  // Route changes: follow the list tab the route implies and finish any slide-out animation.
-  if (prevPath !== pathname) {
-    setPrevPath(pathname);
-    setListTab(tabForPath(pathname, archived, listTab));
-    setClosing(false);
-  }
-
   const commitDeals = useCallback((next: Deal[]) => {
     dealsRef.current = next;
     setDeals(next);
@@ -171,11 +166,24 @@ export function AppProvider({ user, children }: { user: SessionUser; children: R
         const data = await fetchAppData(supabase, session);
         // A write started while we were reading: this snapshot may miss it, read again.
         if (writeVersion.current !== version && attempt < 2) continue;
-        commitDeals(data.deals);
+        const local = readArchived(session.id);
+        const dealIds = new Set(data.deals.map((d) => d.id));
+        const merged = data.deals.map((d) => (local.includes(d.id) ? { ...d, archived: true } : d));
+        commitDeals(merged);
         commitPools(data.pools);
         setContacts(data.contacts);
         setReviews(data.reviews);
         setMeStats(data.meStats);
+        const leftover = local.filter((id) => !dealIds.has(id));
+        setArchived(leftover);
+        if (leftover.length !== local.length) {
+          localStorage.setItem(archivedKey(session.id), JSON.stringify(leftover));
+        }
+        for (const deal of merged) {
+          if (deal.archived && !data.deals.find((d) => d.id === deal.id)?.archived) {
+            void supabase.from("deal_rooms").update({ archived: true }).eq("id", deal.id);
+          }
+        }
         setSyncError("");
         break;
       }
@@ -344,13 +352,40 @@ export function AppProvider({ user, children }: { user: SessionUser; children: R
 
   const toggleArchive = useCallback(
     (id: string) => {
+      const deal = dealsRef.current.find((d) => d.id === id);
+      if (deal) {
+        updateDeal(id, (d) => ({ ...d, archived: !d.archived }));
+        return;
+      }
       setArchived((current) => {
         const next = current.includes(id) ? current.filter((x) => x !== id) : [...current, id];
         localStorage.setItem(archivedKey(session.id), JSON.stringify(next));
         return next;
       });
     },
-    [session.id],
+    [session.id, updateDeal],
+  );
+
+  const deleteDeal = useCallback(
+    async (id: string) => {
+      const deal = dealsRef.current.find((d) => d.id === id);
+      if (!deal) return;
+      if (deal.createdBy !== session.id) {
+        setSyncError("Kelishuvni faqat muallif o'chira oladi.");
+        throw new Error("not creator");
+      }
+      commitDeals(dealsRef.current.filter((d) => d.id !== id));
+      try {
+        await deleteDealRoom(supabase, session, id);
+        setSyncError("");
+      } catch (error) {
+        setSyncError(explainError(error));
+        void load();
+        throw error;
+      }
+      if (pathRef.current === `/dashboard/deals/${id}`) router.push("/dashboard");
+    },
+    [session, supabase, commitDeals, load, router],
   );
 
   const setTheme = useCallback((next: Theme) => {
@@ -396,6 +431,16 @@ export function AppProvider({ user, children }: { user: SessionUser; children: R
   const closeNewChat = useCallback(() => setNewChat((current) => ({ ...current, open: false })), []);
 
   const incomingInvites = useMemo(() => deals.filter((d) => d.incomingInvite), [deals]);
+  const archivedIds = useMemo(
+    () => [...deals.filter((d) => d.archived).map((d) => d.id), ...archived],
+    [deals, archived],
+  );
+
+  if (prevPath !== pathname) {
+    setPrevPath(pathname);
+    setListTab(tabForPath(pathname, archivedIds, listTab));
+    setClosing(false);
+  }
 
   const respondToInvite = useCallback(
     async (invitationId: string, accept: boolean) => {
@@ -444,7 +489,7 @@ export function AppProvider({ user, children }: { user: SessionUser; children: R
       deals,
       pools,
       unread,
-      archived,
+      archived: archivedIds,
       theme,
       hydrated,
       newChat,
@@ -458,6 +503,7 @@ export function AppProvider({ user, children }: { user: SessionUser; children: R
       addPool,
       markRead,
       toggleArchive,
+      deleteDeal,
       setTheme,
       openNewChat,
       closeNewChat,
@@ -478,7 +524,7 @@ export function AppProvider({ user, children }: { user: SessionUser; children: R
       deals,
       pools,
       unread,
-      archived,
+      archivedIds,
       theme,
       hydrated,
       newChat,
@@ -491,6 +537,7 @@ export function AppProvider({ user, children }: { user: SessionUser; children: R
       addPool,
       markRead,
       toggleArchive,
+      deleteDeal,
       setTheme,
       openNewChat,
       closeNewChat,
