@@ -14,6 +14,7 @@ import {
   Bubble,
   ChatHeader,
   ChatInputBar,
+  ChatThread,
   DateDivider,
   EmptyNote,
   IconButton,
@@ -64,20 +65,12 @@ export default function DealChatPage() {
   const mediatingRef = useRef(false);
   const shownTips = useRef<Record<string, string[]>>({});
   const lastRealCount = useRef<{ id: string; count: number } | null>(null);
-  const bottomRef = useRef<HTMLDivElement>(null);
   const fileRef = useRef<HTMLInputElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
-  const firstScroll = useRef(true);
 
   useEffect(() => {
     markRead(id);
   }, [id, markRead]);
-
-  const messageCount = deal?.messages.length ?? 0;
-  useEffect(() => {
-    bottomRef.current?.scrollIntoView({ behavior: firstScroll.current ? "auto" : "smooth", block: "end" });
-    firstScroll.current = false;
-  }, [messageCount, busy, tips.length, mediating]);
 
   // Real chat messages only: people's text — no system notices, cards or AI replies.
   const realMessages = useMemo(
@@ -460,46 +453,49 @@ export default function DealChatPage() {
         }
       />
 
-      <div className="chat-bg min-h-0 flex-1 overflow-y-auto px-3 py-3 md:px-6">
-        <div className="flex w-full flex-col gap-1.5">
-          {items.map(({ message, day, showDay }) => (
-            <div key={message.id} className="contents">
-              {showDay ? <DateDivider label={day} /> : null}
-              {renderMessage(message)}
-              {dealTips
-                .filter((tip) => tip.afterId === message.id)
-                .map((tip) => (
-                  <MediatorTip
-                    key={tip.id}
-                    tip={tip}
-                    onDiscuss={() => {
-                      dismissTip(tip.id);
-                      inputRef.current?.focus();
-                    }}
-                    onIgnore={() => dismissTip(tip.id)}
-                  />
-                ))}
-            </div>
-          ))}
-          {mediating === deal.id ? <MediatorTyping /> : null}
-          {busy ? (
-            <TypingBubble label={busy === "generate" ? "Kelishuv tayyorlanmoqda…" : "Tahlil qilinmoqda…"} />
-          ) : null}
-          <div ref={bottomRef} />
-        </div>
-      </div>
-
-      <input ref={fileRef} type="file" className="hidden" onChange={onFile} />
-      <ChatInputBar
-        value={draft}
-        onChange={setDraft}
-        onSubmit={send}
-        placeholder="Xabar yozing..."
-        inputRef={inputRef}
-        notice={notice}
-        plus={{ open: plusOpen, onToggle: () => setPlusOpen((v) => !v), items: plusItems }}
-        quick={quick}
-      />
+      <ChatThread
+        key={deal.id}
+        scrollKey={`${deal.messages.length}:${deal.messages.at(-1)?.id ?? ""}:${busy}:${tips.length}:${mediating}`}
+        footer={
+          <>
+            <input ref={fileRef} type="file" className="hidden" onChange={onFile} />
+            <ChatInputBar
+              value={draft}
+              onChange={setDraft}
+              onSubmit={send}
+              placeholder="Xabar yozing..."
+              inputRef={inputRef}
+              notice={notice}
+              plus={{ open: plusOpen, onToggle: () => setPlusOpen((v) => !v), items: plusItems }}
+              quick={quick}
+            />
+          </>
+        }
+      >
+        {items.map(({ message, day, showDay }) => (
+          <div key={message.id} className="contents">
+            {showDay ? <DateDivider label={day} /> : null}
+            {renderMessage(message)}
+            {dealTips
+              .filter((tip) => tip.afterId === message.id)
+              .map((tip) => (
+                <MediatorTip
+                  key={tip.id}
+                  tip={tip}
+                  onDiscuss={() => {
+                    dismissTip(tip.id);
+                    inputRef.current?.focus();
+                  }}
+                  onIgnore={() => dismissTip(tip.id)}
+                />
+              ))}
+          </div>
+        ))}
+        {mediating === deal.id ? <MediatorTyping /> : null}
+        {busy ? (
+          <TypingBubble label={busy === "generate" ? "Kelishuv tayyorlanmoqda…" : "Tahlil qilinmoqda…"} />
+        ) : null}
+      </ChatThread>
 
       <InfoDrawer open={drawer === "doc"} title="Hujjat" onClose={() => setDrawer(null)}>
         {deal.agreement ? (

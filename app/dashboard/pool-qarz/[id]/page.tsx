@@ -11,6 +11,7 @@ import {
   Bubble,
   ChatHeader,
   ChatInputBar,
+  ChatThread,
   DateDivider,
   EmptyNote,
   IconButton,
@@ -63,19 +64,13 @@ export default function PoolChatPage() {
   const [amountRaw, setAmountRaw] = useState("");
   const [notice, setNotice] = useState("");
   const [drawer, setDrawer] = useState<"people" | "schedule" | null>(null);
-  const bottomRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
-  const firstScroll = useRef(true);
 
   useEffect(() => {
     markRead(id);
   }, [id, markRead]);
 
   const activityCount = pool?.activity.length ?? 0;
-  useEffect(() => {
-    bottomRef.current?.scrollIntoView({ behavior: firstScroll.current ? "auto" : "smooth", block: "end" });
-    firstScroll.current = false;
-  }, [activityCount]);
 
   const entries = useMemo<Entry[]>(() => {
     if (!pool) return [];
@@ -230,54 +225,55 @@ export default function PoolChatPage() {
 
       <PinnedProgress pool={current} />
 
-      <div className="chat-bg min-h-0 flex-1 overflow-y-auto px-3 py-3 md:px-6">
-        <div className="flex w-full flex-col gap-1.5">
-          {entries.map((entry, index) => {
-            const showDay = index === 0 || entries[index - 1].day !== entry.day;
-            return (
-              <div key={entry.id} className="contents">
-                {showDay ? <DateDivider label={entry.day} /> : null}
-                {entry.type === "card" ? (
-                  <PoolCardMessage
-                    id={entry.id}
-                    pool={current}
-                    canGive={canContribute}
-                    onGive={() => inputRef.current?.focus()}
-                  />
-                ) : entry.type === "system" ? (
-                  <SystemMessage id={entry.id} text={entry.text} />
-                ) : (
-                  <Bubble
-                    id={entry.id}
-                    side={entry.side}
-                    name={entry.name}
-                    nameColor={nameColor(entry.name)}
-                    time={entry.time}
-                  >
-                    <p className="text-[14.5px] leading-[1.4]">{entry.text}</p>
-                  </Bubble>
-                )}
-              </div>
-            );
-          })}
-          <div ref={bottomRef} />
-        </div>
-      </div>
-
-      <ChatInputBar
-        value={amountRaw}
-        onChange={(value) => {
-          setAmountRaw(formatAmountInput(value));
-          setNotice("");
-        }}
-        onSubmit={contribute}
-        placeholder={placeholder}
-        inputRef={inputRef}
-        disabled={!canContribute}
-        inputMode="numeric"
-        notice={notice}
-        quick={quick}
-      />
+      <ChatThread
+        key={current.id}
+        scrollKey={`${id}:${activityCount}`}
+        footer={
+          <ChatInputBar
+            value={amountRaw}
+            onChange={(value) => {
+              setAmountRaw(formatAmountInput(value));
+              setNotice("");
+            }}
+            onSubmit={contribute}
+            placeholder={placeholder}
+            inputRef={inputRef}
+            disabled={!canContribute}
+            inputMode="numeric"
+            notice={notice}
+            quick={quick}
+          />
+        }
+      >
+        {entries.map((entry, index) => {
+          const showDay = index === 0 || entries[index - 1].day !== entry.day;
+          return (
+            <div key={entry.id} className="contents">
+              {showDay ? <DateDivider label={entry.day} /> : null}
+              {entry.type === "card" ? (
+                <PoolCardMessage
+                  id={entry.id}
+                  pool={current}
+                  canGive={canContribute}
+                  onGive={() => inputRef.current?.focus()}
+                />
+              ) : entry.type === "system" ? (
+                <SystemMessage id={entry.id} text={entry.text} />
+              ) : (
+                <Bubble
+                  id={entry.id}
+                  side={entry.side}
+                  name={entry.name}
+                  nameColor={nameColor(entry.name)}
+                  time={entry.time}
+                >
+                  <p className="text-[14.5px] leading-[1.4]">{entry.text}</p>
+                </Bubble>
+              )}
+            </div>
+          );
+        })}
+      </ChatThread>
 
       <InfoDrawer open={drawer === "people"} title="Ishtirokchilar" onClose={() => setDrawer(null)}>
         <ul className="py-2">

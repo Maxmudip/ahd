@@ -3,6 +3,8 @@
 import Link from "next/link";
 import {
   useEffect,
+  useLayoutEffect,
+  useRef,
   useState,
   type FormEvent,
   type ReactNode,
@@ -10,6 +12,7 @@ import {
 } from "react";
 import { ArrowLeft, ArrowRight, Check, CheckCheck, EllipsisVertical, Mic, Plus, X } from "lucide-react";
 import { useApp } from "@/components/app-store";
+import { useChatScroll } from "@/hooks/use-chat-scroll";
 import { isFreshId } from "@/lib/chat-helpers";
 
 export const R_OWN = "12px 0 12px 12px";
@@ -318,6 +321,58 @@ export function InfoDrawer({
 }
 
 export type PillItem = { label: string; onClick: () => void; disabled?: boolean };
+
+/** Scrollable transcript + fixed input. Last message stays above the composer. */
+export function ChatThread({
+  children,
+  footer,
+  scrollKey,
+}: {
+  children: ReactNode;
+  footer: ReactNode;
+  scrollKey: unknown;
+}) {
+  const { listRef, scrollToBottom } = useChatScroll(scrollKey);
+  const barRef = useRef<HTMLDivElement>(null);
+  const [barH, setBarH] = useState(96);
+
+  useLayoutEffect(() => {
+    const el = barRef.current;
+    if (!el || typeof ResizeObserver === "undefined") return;
+    const sync = () => setBarH(Math.max(80, el.offsetHeight));
+    const ro = new ResizeObserver(sync);
+    ro.observe(el);
+    sync();
+    return () => ro.disconnect();
+  }, []);
+
+  useEffect(() => {
+    const bar = barRef.current;
+    if (!bar) return;
+    const onFocus = () => scrollToBottom(true);
+    bar.addEventListener("focusin", onFocus);
+    return () => bar.removeEventListener("focusin", onFocus);
+  }, [scrollToBottom]);
+
+  useEffect(() => {
+    scrollToBottom(true);
+  }, [barH, scrollToBottom]);
+
+  return (
+    <>
+      <div
+        ref={listRef}
+        className="chat-bg min-h-0 flex-1 overflow-y-auto scroll-smooth overscroll-contain px-3 pt-3 md:px-6"
+        style={{ paddingBottom: barH, WebkitOverflowScrolling: "touch" }}
+      >
+        <div className="flex w-full flex-col gap-1.5">{children}</div>
+      </div>
+      <div ref={barRef} className="absolute inset-x-0 bottom-0 z-10">
+        {footer}
+      </div>
+    </>
+  );
+}
 
 export function ChatInputBar({
   value,

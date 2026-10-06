@@ -20,7 +20,7 @@ export function ChatShell({ children }: { children: ReactNode }) {
   const { theme, closing, syncError, dismissSyncError, incomingInvites, respondToInvite } = useApp();
   const banner = incomingInvites[0] ?? null;
   const from = banner?.parties.find((p) => p.userId === banner.createdBy)?.name || banner?.title || "";
-  const { height } = useWindowSize();
+  const { height, offsetTop } = useWindowSize();
   const isMobile = useIsMobile();
   const sidebarWidth = useSidebarWidth();
   const asideRef = useRef<HTMLElement>(null);
@@ -29,16 +29,20 @@ export function ChatShell({ children }: { children: ReactNode }) {
   const showTabs = isList || pathname.startsWith("/dashboard/settings");
   const chatOpen = !isList && !closing;
 
-  // Follow the visual viewport so the input bar stays above the on-screen keyboard.
+  // Pin the shell to the visual viewport so the input bar stays above the keyboard.
   useEffect(() => {
     if (isMobile) window.scrollTo(0, 0);
-  }, [isMobile, height]);
+  }, [isMobile, height, offsetTop]);
 
   return (
     <div
       data-theme={theme}
       className="flex h-dvh w-full max-w-full flex-col overflow-hidden bg-chat text-ink"
-      style={isMobile && height > 0 ? { height } : undefined}
+      style={
+        isMobile && height > 0
+          ? { position: "fixed", top: offsetTop, left: 0, right: 0, height }
+          : undefined
+      }
     >
       <div className="relative flex min-h-0 w-full flex-1 overflow-hidden">
         <aside
