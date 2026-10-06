@@ -1,6 +1,6 @@
 import Anthropic from "@anthropic-ai/sdk";
 
-export const CLAUDE_MODEL = "claude-sonnet-4-5-20251001";
+export const CLAUDE_MODEL = "claude-haiku-4-5-20251001";
 
 export function readAnthropicKey(): string | null {
   const key = (process.env.ANTHROPIC_API_KEY ?? "").trim().replace(/^["']|["']$/g, "").trim();
