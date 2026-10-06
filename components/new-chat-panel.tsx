@@ -2,8 +2,9 @@
 
 import { useRouter } from "next/navigation";
 import { useMemo, useState } from "react";
-import { ArrowLeft, Check, Search } from "lucide-react";
+import { ArrowLeft, Check, Search, UserPlus } from "lucide-react";
 import { Avatar } from "@/components/avatar";
+import { AddContactSheet } from "@/components/add-contact";
 import { useApp } from "@/components/app-store";
 import { EmptyNote, IconButton } from "@/components/chat-ui";
 import { freshId, initialsOf } from "@/lib/chat-helpers";
@@ -37,6 +38,7 @@ export function NewChatPanel() {
   const [busy, setBusy] = useState(false);
   const [formError, setFormError] = useState("");
   const [wasOpen, setWasOpen] = useState(false);
+  const [addOpen, setAddOpen] = useState(false);
 
   if (open !== wasOpen) {
     setWasOpen(open);
@@ -286,7 +288,17 @@ export function NewChatPanel() {
                 />
               </label>
             </div>
-            <p className="px-1 pt-3 pb-1 text-[12px] font-medium tracking-[0.04em] text-ink2 uppercase">Kontaktlar</p>
+            <p className="flex items-center justify-between px-1 pt-3 pb-1 text-[12px] font-medium tracking-[0.04em] text-ink2 uppercase">
+              Kontaktlar
+              <button
+                type="button"
+                onClick={() => setAddOpen(true)}
+                className="inline-flex items-center gap-1 text-[12px] font-semibold tracking-normal text-ink normal-case hover:opacity-70"
+              >
+                <UserPlus size={14} />
+                Qo'shish
+              </button>
+            </p>
             {contacts.map((c) => {
               const on = pickedId === c.id;
               return (
@@ -357,6 +369,14 @@ export function NewChatPanel() {
           </>
         ) : null}
       </div>
+      <AddContactSheet
+        open={addOpen}
+        onClose={() => setAddOpen(false)}
+        onAdded={(person) => {
+          setPickedId(person.id);
+          setInviteEmail(person.email ?? "");
+        }}
+      />
     </div>
   );
 }

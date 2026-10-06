@@ -15,6 +15,8 @@ import {
   explainError,
   fetchAppData,
   fetchContacts,
+  findUserByEmail,
+  addContact,
   deleteDealRoom,
   insertDeal,
   insertPool,
@@ -58,6 +60,8 @@ type AppStore = {
   /** Other registered users: people you can start a chat or a pool with. */
   contacts: Person[];
   refreshContacts: () => Promise<void>;
+  searchUserByEmail: (email: string) => Promise<Person | null>;
+  addContactById: (userId: string) => Promise<void>;
   /** Last failed database call (shown as a banner); empty when everything is fine. */
   syncError: string;
   dismissSyncError: () => void;
@@ -413,6 +417,19 @@ export function AppProvider({ user, children }: { user: SessionUser; children: R
     }
   }, [supabase, session]);
 
+  const searchUserByEmail = useCallback(
+    async (email: string) => findUserByEmail(supabase, email),
+    [supabase],
+  );
+
+  const addContactById = useCallback(
+    async (userId: string) => {
+      await addContact(supabase, session.id, userId);
+      await refreshContacts();
+    },
+    [supabase, session.id, refreshContacts],
+  );
+
   const signOut = useCallback(async () => {
     await supabase.auth.signOut();
     router.replace("/login");
@@ -483,6 +500,8 @@ export function AppProvider({ user, children }: { user: SessionUser; children: R
       email: session.email,
       contacts,
       refreshContacts,
+      searchUserByEmail,
+      addContactById,
       syncError,
       dismissSyncError,
       signOut,
@@ -518,6 +537,8 @@ export function AppProvider({ user, children }: { user: SessionUser; children: R
       session.email,
       contacts,
       refreshContacts,
+      searchUserByEmail,
+      addContactById,
       syncError,
       dismissSyncError,
       signOut,

@@ -153,6 +153,12 @@ type PgError = { code?: string; message: string };
 export function explainError(error: unknown): string {
   const e = (error ?? {}) as Partial<PgError> & { details?: string; hint?: string };
   const text = `${e.message ?? ""} ${e.details ?? ""} ${e.hint ?? ""}`.toLowerCase();
+  if (text.includes("find_user_by_email") || text.includes("add_contact_pair")) {
+    return "Kontakt qo'shish uchun supabase/migrations/20261006040000_add_contact_by_email.sql ni ishga tushiring.";
+  }
+  if ((e.code === "PGRST205" || e.code === "42P01") && text.includes("contacts")) {
+    return "contacts jadvali yo'q. supabase/migrations/20261006030000_contacts.sql ni ishga tushiring.";
+  }
   if (e.code === "PGRST205" || e.code === "42P01" || text.includes("deal_invitations")) {
     return "deal_invitations jadvali yo'q. Supabase SQL Editor'da supabase/migrations/20261006000000_deal_invitations.sql ni ishga tushiring.";
   }
@@ -521,6 +527,36 @@ export async function fetchAppData(sb: SupabaseClient, me: SessionUser): Promise
 export async function fetchContacts(sb: SupabaseClient, me: SessionUser): Promise<Person[]> {
   const users = await fetchOwnedContactUsers(sb, me.id);
   return users.filter((u) => u.id !== me.id).map(personFromUser).sort((a, b) => a.name.localeCompare(b.name));
+}
+
+type FoundUserRow = { id: string; full_name: string; email: string | null; phone: string | null };
+
+/** Look up a registered user by exact email. Does not list the directory. */
+export async function findUserByEmail(sb: SupabaseClient, email: string): Promise<Person | null> {
+  const { data, error } = await sb.rpc("find_user_by_email", { p_email: email.trim().toLowerCase() });
+  if (error) throw error;
+  const row = (Array.isArray(data) ? data[0] : data) as FoundUserRow | null;
+  if (!row?.id) return null;
+  return personFromUser({
+    id: row.id,
+    full_name: row.full_name,
+    email: row.email,
+    phone: row.phone,
+  });
+}
+
+/**
+ * Adds a contact for the signed-in user and the reverse row so both lists update.
+ * Own row: contacts.user_id = me, contacts.contact_user_id = them.
+ */
+export async function addContact(sb: SupabaseClient, meId: string, contactUserId: string) {
+  if (meId === contactUserId) {
+    throw new Error("O'zingizni kontaktga qo'sha olmaysiz.");
+  }
+  const own = await sb.from("contacts").insert({ user_id: meId, contact_user_id: contactUserId });
+  if (own.error && own.error.code !== "23505") throw own.error;
+  const reverse = await sb.rpc("add_contact_pair", { a: meId, b: contactUserId });
+  if (reverse.error) throw reverse.error;
 }
 
 /* -------------------------------------------------------------------------------------------

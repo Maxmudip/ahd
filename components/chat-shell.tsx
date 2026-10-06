@@ -26,7 +26,8 @@ export function ChatShell({ children }: { children: ReactNode }) {
   const asideRef = useRef<HTMLElement>(null);
 
   const isList = pathname === "/dashboard" || pathname === "/dashboard/pool-qarz";
-  const showTabs = isList || pathname.startsWith("/dashboard/settings");
+  const showTabs =
+    isList || pathname.startsWith("/dashboard/settings") || pathname.startsWith("/dashboard/contacts");
   const chatOpen = !isList && !closing;
 
   // Pin the shell to the visual viewport so the input bar stays above the keyboard.

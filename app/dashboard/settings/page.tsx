@@ -1,7 +1,8 @@
 "use client";
 
 import { useState } from "react";
-import { LogOut, Moon, Sun } from "lucide-react";
+import { LogOut, Moon, Sun, UserPlus } from "lucide-react";
+import Link from "next/link";
 import { useApp } from "@/components/app-store";
 import { Avatar } from "@/components/avatar";
 import { RatingBadge, RatingStars } from "@/components/deal-close";
@@ -9,7 +10,7 @@ import { PageFrame } from "@/components/page-frame";
 import { initialsOf } from "@/lib/chat-helpers";
 
 export default function SettingsPage() {
-  const { theme, setTheme, me, email, signOut, reviews } = useApp();
+  const { theme, setTheme, me, email, signOut, reviews, contacts } = useApp();
   const [leaving, setLeaving] = useState(false);
 
   return (
@@ -37,6 +38,17 @@ export default function SettingsPage() {
         <Property label="Til" value="O'zbekcha" />
         <Property label="Imzo" value="Ulangan emas" muted />
       </dl>
+
+      <Link
+        href="/dashboard/contacts"
+        className="mt-6 flex h-11 items-center justify-between rounded-[10px] border border-line px-3 text-[14px] font-medium text-ink hover:bg-hov"
+      >
+        <span className="flex items-center gap-2">
+          <UserPlus size={16} />
+          Kontaktlar
+        </span>
+        <span className="text-ink2">{contacts.length}</span>
+      </Link>
 
       <h2 className="mt-8 text-[13px] font-medium tracking-[0.04em] text-ink2 uppercase">So&apos;nggi baholar</h2>
       {reviews.length === 0 ? (

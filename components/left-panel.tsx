@@ -1,9 +1,9 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
-import { CheckCheck, FileText, Paperclip, PenLine, Search, Settings, SquarePen, Wallet } from "lucide-react";
+import { CheckCheck, FileText, Paperclip, PenLine, Search, Settings, SquarePen, UserPlus, Users, Wallet } from "lucide-react";
 import { Avatar, GroupAvatar } from "@/components/avatar";
 import { useApp, type ListTab } from "@/components/app-store";
 import { EmptyNote, IconButton } from "@/components/chat-ui";
@@ -38,11 +38,21 @@ type Row = {
   archived?: boolean;
 };
 
-const TABS: { id: ListTab; label: string }[] = [
-  { id: "deals", label: "Kelishuvlar" },
-  { id: "pools", label: "Pool Qarz" },
-  { id: "archive", label: "Arxiv" },
+type NavItem =
+  | { type: "tab"; id: ListTab; label: string }
+  | { type: "link"; id: "contacts"; label: string; href: string };
+
+const NAV: NavItem[] = [
+  { type: "tab", id: "deals", label: "Kelishuvlar" },
+  { type: "link", id: "contacts", label: "Kontaktlar", href: "/dashboard/contacts" },
+  { type: "tab", id: "pools", label: "Pool Qarz" },
+  { type: "tab", id: "archive", label: "Arxiv" },
 ];
+
+const tabClass = (on: boolean) =>
+  `relative inline-flex h-7 shrink-0 items-center gap-1 rounded-full px-3 text-[13px] font-medium before:absolute before:inset-x-0 before:-inset-y-2 before:content-[''] ${
+    on ? "bg-btn text-btnink" : "bg-wash text-ink2 hover:text-ink"
+  }`;
 
 function Preview({ icon, children }: { icon?: ReactNode; children: ReactNode }) {
   return (
@@ -115,7 +125,9 @@ function poolPreview(pool: PoolRequest): ReactNode {
 
 export function LeftPanel() {
   const pathname = usePathname();
+  const router = useRouter();
   const { me, deals, contacts, pools, unread, archived, openNewChat, listTab: tab, setListTab: setTab, incomingInvites, respondToInvite, toggleArchive, deleteDeal } = useApp();
+  const onContacts = pathname.startsWith("/dashboard/contacts");
   const [query, setQuery] = useState("");
   const [swipeId, setSwipeId] = useState<string | null>(null);
   const [deleteId, setDeleteId] = useState<string | null>(null);
@@ -231,26 +243,42 @@ export function LeftPanel() {
         </label>
       </div>
 
-      <div className="flex shrink-0 gap-1.5 px-3 pb-2" role="tablist">
-        {TABS.map((item) => (
-          <button
-            key={item.id}
-            role="tab"
-            type="button"
-            aria-selected={tab === item.id}
-            onClick={() => setTab(item.id)}
-            className={`relative h-7 rounded-full px-3 text-[13px] font-medium before:absolute before:inset-x-0 before:-inset-y-2 before:content-[''] ${
-              tab === item.id ? "bg-btn text-btnink" : "bg-wash text-ink2 hover:text-ink"
-            }`}
-          >
-            {item.label}
-            {item.id === "deals" && incomingInvites.length > 0 ? (
-              <span className="ml-1.5 inline-flex h-4 min-w-4 items-center justify-center rounded-full bg-[#C9A84C] px-1 text-[10px] font-semibold text-[#111]">
-                {incomingInvites.length}
-              </span>
-            ) : null}
-          </button>
-        ))}
+      <div className="flex shrink-0 gap-1.5 overflow-x-auto px-3 pb-2" role="tablist">
+        {NAV.map((item) =>
+          item.type === "link" ? (
+            <Link
+              key={item.id}
+              href={item.href}
+              role="tab"
+              aria-selected={onContacts}
+              className={tabClass(onContacts)}
+            >
+              <Users size={13} />
+              {item.label}
+            </Link>
+          ) : (
+            <button
+              key={item.id}
+              role="tab"
+              type="button"
+              aria-selected={!onContacts && tab === item.id}
+              onClick={() => {
+                setTab(item.id);
+                if (onContacts) {
+                  router.push(item.id === "pools" ? "/dashboard/pool-qarz" : "/dashboard");
+                }
+              }}
+              className={tabClass(!onContacts && tab === item.id)}
+            >
+              {item.label}
+              {item.id === "deals" && incomingInvites.length > 0 ? (
+                <span className="ml-1.5 inline-flex h-4 min-w-4 items-center justify-center rounded-full bg-[#C9A84C] px-1 text-[10px] font-semibold text-[#111]">
+                  {incomingInvites.length}
+                </span>
+              ) : null}
+            </button>
+          ),
+        )}
       </div>
 
       <div className="min-h-0 flex-1 overflow-y-auto">
@@ -368,6 +396,9 @@ export function LeftPanel() {
             Onlayn
           </p>
         </div>
+        <IconButton href="/dashboard/contacts" label="Kontaktlar">
+          <UserPlus size={20} />
+        </IconButton>
         <IconButton href="/dashboard/settings" label="Sozlamalar">
           <Settings size={20} />
         </IconButton>

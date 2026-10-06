@@ -3,25 +3,32 @@
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import type { ReactNode } from "react";
-import { MessageCircle, User, Users } from "lucide-react";
+import { MessageCircle, User, Users, UsersRound } from "lucide-react";
 import { useApp, type ListTab } from "@/components/app-store";
 
 type Item = {
-  id: "deals" | "pools" | "profile";
+  id: "deals" | "contacts" | "pools" | "profile";
   label: string;
   href: string;
   icon: ReactNode;
   badge: number;
 };
 
-/** Bottom tab bar, mobile only: Kelishuvlar | Pool Qarz | Profil. */
+/** Bottom tab bar, mobile only: Kelishuvlar | Kontaktlar | Pool Qarz | Profil. */
 export function MobileTabBar() {
   const pathname = usePathname();
   const router = useRouter();
   const { deals, pools, unread, archived, listTab, setListTab, goBack } = useApp();
 
   const onProfile = pathname.startsWith("/dashboard/settings");
-  const active: Item["id"] = onProfile ? "profile" : listTab === "pools" ? "pools" : "deals";
+  const onContacts = pathname.startsWith("/dashboard/contacts");
+  const active: Item["id"] = onProfile
+    ? "profile"
+    : onContacts
+      ? "contacts"
+      : listTab === "pools"
+        ? "pools"
+        : "deals";
 
   const count = (ids: string[]) => ids.reduce((sum, id) => sum + (archived.includes(id) ? 0 : (unread[id] ?? 0)), 0);
 
@@ -34,6 +41,13 @@ export function MobileTabBar() {
       badge: count(deals.map((d) => d.id)),
     },
     {
+      id: "contacts",
+      label: "Kontaktlar",
+      href: "/dashboard/contacts",
+      icon: <UsersRound size={24} />,
+      badge: 0,
+    },
+    {
       id: "pools",
       label: "Pool Qarz",
       href: "/dashboard/pool-qarz",
@@ -44,18 +58,18 @@ export function MobileTabBar() {
   ];
 
   function open(event: React.MouseEvent, item: Item) {
-    if (item.id === "profile") return; // plain link: the profile screen slides in
+    if (item.id === "profile" || item.id === "contacts") return; // plain link: the screen slides in
     event.preventDefault();
     const tab: ListTab = item.id === "pools" ? "pools" : "deals";
     setListTab(tab);
-    if (onProfile) goBack(item.href);
+    if (onProfile || onContacts) goBack(item.href);
     else if (pathname !== item.href) router.push(item.href);
   }
 
   return (
     <nav
       aria-label="Asosiy"
-      className="z-20 grid shrink-0 grid-cols-3 border-t border-line bg-panel md:hidden"
+      className="z-20 grid shrink-0 grid-cols-4 border-t border-line bg-panel md:hidden"
       style={{ height: "calc(60px + env(safe-area-inset-bottom))", paddingBottom: "env(safe-area-inset-bottom)" }}
     >
       {items.map((item) => {
