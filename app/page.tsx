@@ -290,7 +290,7 @@ export default function HomePage() {
       <section id="narxlar" className="scroll-mt-16 px-5 py-20">
         <div className="mx-auto max-w-6xl">
           <p className="text-[12px] font-semibold tracking-[0.16em] text-[#888] uppercase">Narxlar</p>
-          <h2 className="mt-3 text-3xl font-bold tracking-tight sm:text-4xl">Oddiy tariflar</h2>
+          <h2 className="mt-3 text-3xl font-bold tracking-tight sm:text-4xl">Tariflar</h2>
           <p className="mt-3 max-w-xl text-[16px] leading-7 text-[#666]">
             Birinchi kelishuv bepul. Keyin ishingiz o&apos;ssin — tarif ham o&apos;sadi.
           </p>
@@ -301,7 +301,7 @@ export default function HomePage() {
                 price: "0",
                 period: "so'm",
                 blurb: "Sinab ko'rish va birinchi hujjat uchun",
-                points: ["3 ta kelishuv / oy", "AI qoralama", "PDF yuklash"],
+                points: ["2 ta kelishuv / oy", "AI qoralama", "PDF yuklash"],
                 featured: false,
               },
               {
